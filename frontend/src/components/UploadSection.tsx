@@ -1,6 +1,11 @@
 import { useState, useCallback } from 'react';
 import axios from 'axios';
 import { useTheme } from '../hooks/useTheme';
+import { useExtraction } from '../hooks/useExtraction';
+import { ExtractionProgress } from './ExtractionProgress';
+import { MarkdownViewer } from './MarkdownViewer';
+import { KeyDetailsPanel } from './KeyDetailsPanel';
+import { ScoreDashboard } from './ScoreDashboard';
 
 interface AnalysisResult {
   word_count: number;
@@ -11,6 +16,7 @@ interface AnalysisResult {
 
 export function UploadSection() {
   const { colors } = useTheme();
+  const { state, startExtraction, reset } = useExtraction();
   const [file, setFile] = useState<File | null>(null);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -38,17 +44,24 @@ export function UploadSection() {
         setFile(droppedFile);
         setResult(null);
         setScrubbedText('');
+        reset();
       }
     }
-  }, []);
+  }, [reset]);
 
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setFile(e.target.files[0]);
       setResult(null);
       setScrubbedText('');
+      reset();
     }
-  }, []);
+  }, [reset]);
+
+  const handleFullExtract = async () => {
+    if (!file) return;
+    startExtraction(file);
+  };
 
   const handleAnalyze = async () => {
     if (!file) return;
@@ -139,17 +152,24 @@ export function UploadSection() {
 
       {/* Action Buttons */}
       {file && (
-        <div className="flex gap-4 justify-center">
+        <div className="flex gap-4 justify-center flex-wrap">
+          <button
+            onClick={handleFullExtract}
+            disabled={state.status === 'processing'}
+            className="px-8 py-3 bg-black text-white text-sm font-semibold rounded-lg transition-all duration-150 hover:bg-bw-800 disabled:opacity-50 disabled:cursor-not-allowed tracking-wide"
+          >
+            {state.status === 'processing' ? 'Processing...' : 'Full Extract'}
+          </button>
           <button
             onClick={handleAnalyze}
-            disabled={loading}
-            className="px-8 py-3 bg-black text-white text-sm font-semibold rounded-lg transition-all duration-150 hover:bg-bw-800 disabled:opacity-50 disabled:cursor-not-allowed tracking-wide"
+            disabled={loading || state.status === 'processing'}
+            className="px-8 py-3 bg-white text-bw-900 text-sm font-semibold rounded-lg border-2 border-bw-900 transition-all duration-150 hover:bg-bw-50 disabled:opacity-50 disabled:cursor-not-allowed tracking-wide"
           >
             {loading ? 'Analyzing...' : 'Analyze PDF'}
           </button>
           <button
             onClick={handleScrub}
-            disabled={loading}
+            disabled={loading || state.status === 'processing'}
             className="px-8 py-3 bg-white text-bw-900 text-sm font-semibold rounded-lg border-2 border-bw-900 transition-all duration-150 hover:bg-bw-50 disabled:opacity-50 disabled:cursor-not-allowed tracking-wide"
           >
             {loading ? 'Scrubbing...' : 'Scrub PDF'}
@@ -157,7 +177,40 @@ export function UploadSection() {
         </div>
       )}
 
-      {/* Analysis Results */}
+      {/* Extraction Progress */}
+      {state.status === 'processing' && (
+        <ExtractionProgress
+          stage={state.stage}
+          stageLabel={state.stageLabel}
+          progressPercent={state.progressPercent}
+          currentMarkdown={state.currentMarkdown}
+        />
+      )}
+
+      {/* Extraction Results */}
+      {state.status === 'complete' && state.result && (
+        <div className="space-y-6">
+          <MarkdownViewer markdown={state.result.markdown} />
+          <KeyDetailsPanel
+            details={state.result.key_details}
+            documentType={state.result.document_type.type}
+            typeConfidence={state.result.document_type.confidence}
+          />
+          <ScoreDashboard
+            scores={state.result.scores}
+            recommendations={state.result.recommendations}
+          />
+        </div>
+      )}
+
+      {/* Extraction Error */}
+      {state.status === 'failed' && (
+        <div className="bg-red-50 rounded-xl p-6 border border-red-200">
+          <p className="text-red-600 text-sm font-medium">Extraction failed: {state.error}</p>
+        </div>
+      )}
+
+      {/* Analysis Results (legacy) */}
       {result && (
         <div className="bg-white rounded-xl p-8 border border-bw-100 shadow-card">
           <h3 className="text-xs font-semibold tracking-wide uppercase text-bw-500 mb-6">Analysis Results</h3>
@@ -186,7 +239,7 @@ export function UploadSection() {
         </div>
       )}
 
-      {/* Scrubbed Text */}
+      {/* Scrubbed Text (legacy) */}
       {scrubbedText && (
         <div className="bg-white rounded-xl p-8 border border-bw-100 shadow-card">
           <h3 className="text-xs font-semibold tracking-wide uppercase text-bw-500 mb-6">Scrubbed Output</h3>
