@@ -14,6 +14,9 @@ class ExtractionScorer
 
         $recommendations = $this->generateRecommendations($completeness, $quality, $piiDetection, $text);
 
+        // Build PII breakdown showing which patterns were found
+        $piiBreakdown = $this->buildPiiBreakdown($piiDetected, $piiPatterns);
+
         return [
             'scores' => [
                 'completeness' => round($completeness, 2),
@@ -21,8 +24,40 @@ class ExtractionScorer
                 'pii_detection' => round($piiDetection, 2),
                 'overall' => round($overall, 2),
             ],
+            'pii_breakdown' => $piiBreakdown,
             'recommendations' => $recommendations,
         ];
+    }
+
+    /**
+     * Build detailed breakdown of which PII patterns were detected
+     */
+    private function buildPiiBreakdown(array $detected, array $patterns): array
+    {
+        $breakdown = [];
+        $patternNames = array_keys($patterns);
+
+        foreach ($patternNames as $name) {
+            $breakdown[$name] = [
+                'found' => in_array($name, $detected),
+                'label' => $this->getPatternLabel($name),
+            ];
+        }
+
+        return $breakdown;
+    }
+
+    /**
+     * Get human-readable label for PII pattern
+     */
+    private function getPatternLabel(string $name): string
+    {
+        return match($name) {
+            'ssn' => 'Social Security Number',
+            'email' => 'Email Address',
+            'phone' => 'Phone Number',
+            default => ucfirst($name),
+        };
     }
 
     private function calculateCompleteness(string $text, int $pageCount): float
@@ -91,7 +126,7 @@ class ExtractionScorer
         return min(0.95, $foundCount / $patternCount + 0.5);
     }
 
-    private function generateRecommendations(float $completeness, float $quality, float $piiDetection, string $text): array
+    private function generateRecommendations(float $completeness, float $quality, float $piiDetection, string $text, array $piiDetected = [], array $piiPatterns = []): array
     {
         $recommendations = [];
 
@@ -112,7 +147,7 @@ class ExtractionScorer
         if ($piiDetection < 0.5 && strlen($text) > 500) {
             $recommendations[] = [
                 'type' => 'pii',
-                'message' => 'Limited PII detected - document may not contain sensitive data',
+                'message' => 'Limited PII detected - document may not contain sensitive data patterns',
             ];
         }
 

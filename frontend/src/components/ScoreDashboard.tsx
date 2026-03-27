@@ -1,4 +1,3 @@
-import { useTheme } from '../hooks/useTheme';
 import { ScoreCard } from './ScoreCard';
 import type { Recommendation } from '../types/extraction';
 
@@ -9,12 +8,15 @@ interface ScoreDashboardProps {
     pii_detection: number;
     overall: number;
   };
+  pii_breakdown?: {
+    ssn: { found: boolean; label: string };
+    email: { found: boolean; label: string };
+    phone: { found: boolean; label: string };
+  };
   recommendations: Recommendation[];
 }
 
-export function ScoreDashboard({ scores, recommendations }: ScoreDashboardProps) {
-  const { colors } = useTheme();
-
+export function ScoreDashboard({ scores, pii_breakdown, recommendations }: ScoreDashboardProps) {
   const overallPercentage = Math.round(scores.overall * 100);
   const isAcceptable = scores.overall >= 0.8;
   const isReviewSuggested = scores.overall >= 0.6 && scores.overall < 0.8;
@@ -46,6 +48,47 @@ export function ScoreDashboard({ scores, recommendations }: ScoreDashboardProps)
           <ScoreCard label="Quality" score={scores.quality} threshold={0.75} weight={0.35} />
           <ScoreCard label="PII Detection" score={scores.pii_detection} threshold={0.85} weight={0.25} />
         </div>
+
+        {pii_breakdown && (
+          <div className="border-t border-bw-100 pt-4 mb-4">
+            <h4 className="text-xs font-semibold text-bw-500 uppercase tracking-wider mb-3">PII Patterns Detected</h4>
+            <div className="flex flex-wrap gap-3">
+              {pii_breakdown.ssn && (
+                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm ${
+                  pii_breakdown.ssn.found
+                    ? 'bg-green-100 text-green-700 border border-green-200'
+                    : 'bg-gray-100 text-gray-500 border border-gray-200'
+                }`}>
+                  <span className={`w-2 h-2 rounded-full ${pii_breakdown.ssn.found ? 'bg-green-500' : 'bg-gray-400'}`} />
+                  <span>{pii_breakdown.ssn.label}</span>
+                  <span className="text-xs opacity-75">{pii_breakdown.ssn.found ? '✓ Found' : 'Not found'}</span>
+                </div>
+              )}
+              {pii_breakdown.email && (
+                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm ${
+                  pii_breakdown.email.found
+                    ? 'bg-green-100 text-green-700 border border-green-200'
+                    : 'bg-gray-100 text-gray-500 border border-gray-200'
+                }`}>
+                  <span className={`w-2 h-2 rounded-full ${pii_breakdown.email.found ? 'bg-green-500' : 'bg-gray-400'}`} />
+                  <span>{pii_breakdown.email.label}</span>
+                  <span className="text-xs opacity-75">{pii_breakdown.email.found ? '✓ Found' : 'Not found'}</span>
+                </div>
+              )}
+              {pii_breakdown.phone && (
+                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm ${
+                  pii_breakdown.phone.found
+                    ? 'bg-green-100 text-green-700 border border-green-200'
+                    : 'bg-gray-100 text-gray-500 border border-gray-200'
+                }`}>
+                  <span className={`w-2 h-2 rounded-full ${pii_breakdown.phone.found ? 'bg-green-500' : 'bg-gray-400'}`} />
+                  <span>{pii_breakdown.phone.label}</span>
+                  <span className="text-xs opacity-75">{pii_breakdown.phone.found ? '✓ Found' : 'Not found'}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {recommendations.length > 0 && (
           <div className="border-t border-bw-100 pt-4">

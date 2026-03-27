@@ -1,12 +1,10 @@
 import { useState } from 'react';
-import { useTheme } from '../hooks/useTheme';
 
 interface MarkdownViewerProps {
   markdown: string;
 }
 
 export function MarkdownViewer({ markdown }: MarkdownViewerProps) {
-  const { colors } = useTheme();
   const [isExpanded, setIsExpanded] = useState(true);
 
   return (

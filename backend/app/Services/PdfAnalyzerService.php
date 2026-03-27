@@ -42,7 +42,7 @@ class PdfAnalyzerService
         return $scrubbed;
     }
 
-    private function checkPiiIndicators(string $text): bool
+    public function checkPiiIndicators(string $text): bool
     {
         $piiKeywords = [
             'ssn', 'social security', 'password', 'secret',

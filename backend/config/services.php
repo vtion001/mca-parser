@@ -10,4 +10,9 @@ return [
     'upload' => [
         'max_size' => env('MAX_UPLOAD_SIZE', 52428800),
     ],
+    'openrouter' => [
+        'api_key' => env('OPENROUTER_API_KEY', ''),
+        'api_url' => env('OPENROUTER_API_URL', 'https://openrouter.ai/api/v1'),
+        'model' => env('OPENROUTER_MODEL', 'openai/gpt-3.5-turbo'),
+    ],
 ];

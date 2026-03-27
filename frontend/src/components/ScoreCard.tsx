@@ -1,5 +1,3 @@
-import { useTheme } from '../hooks/useTheme';
-
 interface ScoreCardProps {
   label: string;
   score: number;
@@ -8,8 +6,6 @@ interface ScoreCardProps {
 }
 
 export function ScoreCard({ label, score, threshold, weight }: ScoreCardProps) {
-  const { colors } = useTheme();
-
   const percentage = Math.round(score * 100);
   const isGood = score >= threshold;
   const isWarning = score >= threshold * 0.8 && score < threshold;

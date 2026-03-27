@@ -1,15 +1,10 @@
-import { useTheme } from '../hooks/useTheme';
-
 interface ExtractionProgressProps {
-  stage: string;
   stageLabel: string;
   progressPercent: number;
   currentMarkdown: string;
 }
 
-export function ExtractionProgress({ stage, stageLabel, progressPercent, currentMarkdown }: ExtractionProgressProps) {
-  const { colors } = useTheme();
-
+export function ExtractionProgress({ stageLabel, progressPercent, currentMarkdown }: ExtractionProgressProps) {
   return (
     <div className="bg-white rounded-xl p-6 border border-bw-100 shadow-card">
       <div className="flex items-center justify-between mb-4">

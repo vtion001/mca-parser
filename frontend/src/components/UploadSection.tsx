@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import axios from 'axios';
 import { useTheme } from '../hooks/useTheme';
 import { useExtraction } from '../hooks/useExtraction';
@@ -6,6 +6,7 @@ import { ExtractionProgress } from './ExtractionProgress';
 import { MarkdownViewer } from './MarkdownViewer';
 import { KeyDetailsPanel } from './KeyDetailsPanel';
 import { ScoreDashboard } from './ScoreDashboard';
+import { AnalysisResults } from './AnalysisResults';
 
 interface AnalysisResult {
   word_count: number;
@@ -17,11 +18,16 @@ interface AnalysisResult {
 export function UploadSection() {
   const { colors } = useTheme();
   const { state, startExtraction, reset } = useExtraction();
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [scrubbedText, setScrubbedText] = useState<string>('');
   const [dragActive, setDragActive] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const triggerFileSelect = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
 
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -38,10 +44,12 @@ export function UploadSection() {
     e.stopPropagation();
     setDragActive(false);
 
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      const droppedFile = e.dataTransfer.files[0];
-      if (droppedFile.type === 'application/pdf') {
-        setFile(droppedFile);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const pdfFiles = Array.from(e.dataTransfer.files).filter(
+        file => file.type === 'application/pdf'
+      );
+      if (pdfFiles.length > 0) {
+        setFiles(pdfFiles);
         setResult(null);
         setScrubbedText('');
         reset();
@@ -50,25 +58,30 @@ export function UploadSection() {
   }, [reset]);
 
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setFile(e.target.files[0]);
-      setResult(null);
-      setScrubbedText('');
-      reset();
+    if (e.target.files && e.target.files.length > 0) {
+      const pdfFiles = Array.from(e.target.files).filter(
+        file => file.type === 'application/pdf'
+      );
+      if (pdfFiles.length > 0) {
+        setFiles(pdfFiles);
+        setResult(null);
+        setScrubbedText('');
+        reset();
+      }
     }
   }, [reset]);
 
   const handleFullExtract = async () => {
-    if (!file) return;
-    startExtraction(file);
+    if (!files.length) return;
+    startExtraction(files[0]);
   };
 
   const handleAnalyze = async () => {
-    if (!file) return;
+    if (!files.length) return;
 
     setLoading(true);
     const formData = new FormData();
-    formData.append('file', file);
+    formData.append('file', files[0]);
     formData.append('remove_pii', 'true');
 
     try {
@@ -84,11 +97,11 @@ export function UploadSection() {
   };
 
   const handleScrub = async () => {
-    if (!file) return;
+    if (!files.length) return;
 
     setLoading(true);
     const formData = new FormData();
-    formData.append('file', file);
+    formData.append('file', files[0]);
     formData.append('remove_pii', 'true');
 
     try {
@@ -118,14 +131,16 @@ export function UploadSection() {
         }`}
         style={{ backgroundColor: colors.bg }}
       >
-        <input
-          type="file"
-          accept=".pdf"
-          onChange={handleFileSelect}
-          className="hidden"
-          id="file-upload"
-        />
-        <label htmlFor="file-upload" className="cursor-pointer block">
+        <label htmlFor="file-upload" className="cursor-pointer block w-full" onClick={triggerFileSelect}>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".pdf"
+            multiple
+            onChange={handleFileSelect}
+            className="hidden"
+            id="file-upload"
+          />
           <div className="mb-6">
             <div className="w-16 h-16 mx-auto border-2 border-bw-300 rounded-xl flex items-center justify-center">
               <svg className="w-8 h-8 text-bw-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -137,21 +152,30 @@ export function UploadSection() {
             {dragActive ? 'Release to drop' : 'Drop PDF or click to select'}
           </p>
           <p className="text-sm text-bw-400">
-            PDF files only, any size accepted
+            PDF files only, multiple selection supported
           </p>
-          {file && (
-            <div className="mt-6 inline-flex items-center gap-2 px-4 py-2 bg-bw-50 rounded-lg border border-bw-100">
-              <svg className="w-4 h-4 text-bw-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-              <span className="text-sm font-medium text-bw-700">{file.name}</span>
+          {files.length > 0 && (
+            <div className="mt-6 space-y-2">
+              <div className="text-sm font-medium text-bw-700">
+                {files.length} file{files.length !== 1 ? 's' : ''} selected
+              </div>
+              <div className="flex flex-wrap gap-2 justify-center">
+                {files.map((f, i) => (
+                  <div key={i} className="inline-flex items-center gap-2 px-3 py-1 bg-bw-50 rounded-lg border border-bw-100">
+                    <svg className="w-4 h-4 text-bw-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span className="text-xs font-medium text-bw-700 truncate max-w-[150px]">{f.name}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </label>
       </div>
 
       {/* Action Buttons */}
-      {file && (
+      {files.length > 0 && (
         <div className="flex gap-4 justify-center flex-wrap">
           <button
             onClick={handleFullExtract}
@@ -180,7 +204,6 @@ export function UploadSection() {
       {/* Extraction Progress */}
       {state.status === 'processing' && (
         <ExtractionProgress
-          stage={state.stage}
           stageLabel={state.stageLabel}
           progressPercent={state.progressPercent}
           currentMarkdown={state.currentMarkdown}
@@ -198,8 +221,10 @@ export function UploadSection() {
           />
           <ScoreDashboard
             scores={state.result.scores}
+            pii_breakdown={state.result.pii_breakdown}
             recommendations={state.result.recommendations}
           />
+          <AnalysisResults result={state.result} />
         </div>
       )}
 

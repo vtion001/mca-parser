@@ -6,3 +6,6 @@ export { MarkdownViewer } from './MarkdownViewer';
 export { KeyDetailsPanel } from './KeyDetailsPanel';
 export { ScoreCard } from './ScoreCard';
 export { ScoreDashboard } from './ScoreDashboard';
+export { DocumentLibrary } from './DocumentLibrary';
+export { BatchProcessor } from './BatchProcessor';
+export { ComparativeView } from './ComparativeView';

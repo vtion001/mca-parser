@@ -17,7 +17,8 @@ class DoclingService
     public function extractText(string $filePath): array
     {
         try {
-            $response = Http::timeout(60)
+            // Use 180 second timeout for OCR processing (can take time on first run)
+            $response = Http::timeout(180)
                 ->attach('file', file_get_contents($filePath), 'document.pdf')
                 ->post($this->serviceUrl . '/extract');
 

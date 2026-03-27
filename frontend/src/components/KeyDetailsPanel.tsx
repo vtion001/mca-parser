@@ -1,4 +1,3 @@
-import { useTheme } from '../hooks/useTheme';
 import type { KeyDetail } from '../types/extraction';
 
 interface KeyDetailsPanelProps {
@@ -8,8 +7,6 @@ interface KeyDetailsPanelProps {
 }
 
 export function KeyDetailsPanel({ details, documentType, typeConfidence }: KeyDetailsPanelProps) {
-  const { colors } = useTheme();
-
   const formatLabel = (label: string) => label.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 
   return (

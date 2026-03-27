@@ -22,8 +22,59 @@ export interface ExtractionResult {
     pii_detection: number;
     overall: number;
   };
+  pii_breakdown?: {
+    ssn: { found: boolean; label: string };
+    email: { found: boolean; label: string };
+    phone: { found: boolean; label: string };
+  };
   recommendations: Recommendation[];
+  balances?: {
+    beginning_balance: {
+      amount: number | null;
+      keyword: string | null;
+      raw_text: string | null;
+    };
+    ending_balance: {
+      amount: number | null;
+      keyword: string | null;
+      raw_text: string | null;
+    };
+  };
+  ai_analysis?: {
+    success: boolean;
+    analysis: AiAnalysis | null;
+    error?: string;
+  };
   page_count: number;
+}
+
+export interface AiAnalysis {
+  qualification_score: number;
+  is_valid_document: boolean;
+  completeness: {
+    score: number;
+    is_complete: boolean;
+    concerns: string[];
+  };
+  pii_found: {
+    has_ssn: boolean;
+    has_account_numbers: boolean;
+    locations: string[];
+  };
+  transaction_summary: {
+    credit_count: number | null;
+    debit_count: number | null;
+    total_amount_credits: number | null;
+    total_amount_debits: number | null;
+  };
+  risk_indicators: {
+    has_large_unusual_transactions: boolean;
+    has_overdraft_signs: boolean;
+    has_high_fee_pattern: boolean;
+    has_returned_items: boolean;
+    details: string[];
+  };
+  recommendations: string[];
 }
 
 export interface KeyDetail {
