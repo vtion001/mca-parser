@@ -25,6 +25,17 @@ class DocumentTypeDetector
             'keywords' => ['name:', 'address:', 'date of birth', 'signature', 'section'],
             'weight' => 0.8,
         ],
+        'bank_statement' => [
+            'keywords' => [
+                'beginning balance', 'ending balance', 'account summary',
+                'statement ending', 'statement period', 'electronic credits',
+                'electronic debits', 'wire from', 'wire to', 'account number',
+                'checks outstanding', 'overdraft fee', 'returned item',
+                'total credits', 'total debits', 'deposits not shown',
+                'branch:', 'member fdic', 'daily balances',
+            ],
+            'weight' => 1.5,
+        ],
     ];
 
     public function detect(string $text): array

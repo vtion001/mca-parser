@@ -139,6 +139,14 @@ class ProcessPdfExtraction implements ShouldQueue
                 }
             }
 
+            // Update batch progress if we have a batch ID
+            if ($this->batchId) {
+                $batch = \App\Models\Batch::find($this->batchId);
+                if ($batch) {
+                    $batch->incrementCompleted();
+                }
+            }
+
             $this->updateProgressComplete($result);
 
         } catch (\Exception $e) {
@@ -184,6 +192,14 @@ class ProcessPdfExtraction implements ShouldQueue
             $document = Document::find($this->documentId);
             if ($document) {
                 $document->markAsFailed($error);
+            }
+        }
+
+        // Update batch progress even on failure (failed counts toward completion)
+        if ($this->batchId) {
+            $batch = \App\Models\Batch::find($this->batchId);
+            if ($batch) {
+                $batch->incrementCompleted();
             }
         }
 

@@ -92,7 +92,7 @@ class ComparisonController extends Controller
             $endingBalance = $doc->balances['ending_balance']['amount'] ?? 0;
             $netChange = $endingBalance - $beginningBalance;
 
-            // Estimate credits and debits from balance change
+            // These are estimates derived from balance change — not parsed from actual transactions
             $credits = $netChange > 0 ? $netChange * 0.3 : 0;
             $debits = $beginningBalance * 0.2;
 
@@ -101,6 +101,8 @@ class ComparisonController extends Controller
                 'filename' => $doc->filename,
                 'total_credits' => round($credits, 2),
                 'total_debits' => round($debits, 2),
+                '_estimated' => true,
+                '_note' => 'Credits/debits are estimated from balance change, not parsed from transaction data',
             ];
         })->toArray();
     }
@@ -111,11 +113,12 @@ class ComparisonController extends Controller
 
         foreach ($documents as $doc) {
             $pii = $doc->pii_breakdown ?? [];
-            foreach ($pii as $type) {
-                if (!isset($piiDetected[$type])) {
-                    $piiDetected[$type] = [];
+            // $pii is keyed by pattern name, e.g. ['ssn' => ['found' => true, 'label' => '...']]
+            foreach ($pii as $name => $info) {
+                if (!isset($piiDetected[$name])) {
+                    $piiDetected[$name] = [];
                 }
-                $piiDetected[$type][] = $doc->filename;
+                $piiDetected[$name][] = $doc->filename;
             }
         }
 

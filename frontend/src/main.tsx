@@ -1,27 +1,33 @@
 import ReactDOM from 'react-dom/client';
 import { useState } from 'react';
 import { ThemeProvider } from './hooks/useTheme';
+import { ExtractionProvider, useExtractionContext } from './contexts/ExtractionContext';
 import {
   Header,
   UploadSection,
   SettingsPanel,
-  DocumentLibrary,
-  BatchProcessor,
-  ComparativeView
+  StatementsView,
+  DocumentDetailPanel,
+  ReviewModal,
 } from './components';
 import './styles/globals.css';
 
-type View = 'upload' | 'library' | 'batch' | 'compare';
+type View = 'upload' | 'library';
 
 function App() {
   const [activeView, setActiveView] = useState<View>('upload');
+  const [selectedDocumentId, setSelectedDocumentId] = useState<number | null>(null);
+  const [selectedResult, setSelectedResult] = useState<import('./types/extraction').ExtractionResult | null>(null);
+  const { state } = useExtractionContext();
 
   const navItems: { id: View; label: string }[] = [
     { id: 'upload', label: 'Upload' },
-    { id: 'library', label: 'Document Library' },
-    { id: 'batch', label: 'Batch Processing' },
-    { id: 'compare', label: 'Comparative Analysis' },
+    { id: 'library', label: 'Statements' },
   ];
+
+  const handleCloseDetail = () => {
+    setSelectedDocumentId(null);
+  };
 
   return (
     <ThemeProvider>
@@ -67,18 +73,11 @@ function App() {
 
           {/* Document Library View */}
           {activeView === 'library' && (
-            <DocumentLibrary
-              selectedIds={[]}
-              onToggleSelect={() => {}}
-              selectionMode={false}
+            <StatementsView
+              result={state.result}
+              onReviewStatement={(result) => setSelectedResult(result)}
             />
           )}
-
-          {/* Batch Processing View */}
-          {activeView === 'batch' && <BatchProcessor />}
-
-          {/* Comparative Analysis View */}
-          {activeView === 'compare' && <ComparativeView />}
         </main>
 
         <footer className="max-w-6xl mx-auto px-8 py-8 border-t border-bw-100">
@@ -87,10 +86,26 @@ function App() {
           </p>
         </footer>
       </div>
+
+      {/* Document Detail Slide-Over Panel */}
+      <DocumentDetailPanel
+        documentId={selectedDocumentId}
+        onClose={handleCloseDetail}
+      />
+
+      {/* Review Modal — full-screen slide-over for statement details */}
+      {selectedResult && (
+        <ReviewModal
+          result={selectedResult}
+          onClose={() => setSelectedResult(null)}
+        />
+      )}
     </ThemeProvider>
   );
 }
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
-  <App />
+  <ExtractionProvider>
+    <App />
+  </ExtractionProvider>
 );

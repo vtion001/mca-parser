@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import axios from 'axios';
 import { DocumentLibrary } from './DocumentLibrary';
 
 interface BatchDocument {
@@ -57,19 +58,26 @@ export function BatchProcessor({ onComplete }: BatchProcessorProps) {
 
     setUploading(true);
     try {
-      // Simulate batch creation and processing start
-      const mockBatch: Batch = {
-        id: Date.now(),
+      // Create batch via backend API
+      const createResponse = await axios.post('/api/v1/batches', {
         name: batchName || `Batch ${new Date().toLocaleDateString()}`,
-        status: 'processing',
-        total_documents: selectedIds.length,
-        completed_documents: 0,
-        documents: documents.filter(d => selectedIds.includes(d.id))
-      };
-      setBatch(mockBatch);
+        document_ids: selectedIds,
+      });
+
+      const createdBatch: Batch = createResponse.data.data;
+
+      // Fetch full batch with documents
+      const batchResponse = await axios.get(`/api/v1/batches/${createdBatch.id}`);
+      const fullBatch: Batch = batchResponse.data.data;
+
+      setBatch(fullBatch);
+
+      // Start processing via backend API
+      await axios.post(`/api/v1/batches/${createdBatch.id}/process`);
+
       setStep('processing');
     } catch (error) {
-      console.error('Failed to create batch:', error);
+      console.error('Failed to create or start batch:', error);
     } finally {
       setUploading(false);
     }
@@ -78,31 +86,34 @@ export function BatchProcessor({ onComplete }: BatchProcessorProps) {
   const pollProgress = async () => {
     if (!batch) return;
 
-    // Simulate progress
-    const interval = setInterval(() => {
-      setBatch(prev => {
-        if (!prev) return prev;
+    const interval = setInterval(async () => {
+      try {
+        const response = await axios.get(`/api/v1/batches/${batch.id}/progress`);
+        const progressData = response.data.data;
 
-        const newCompleted = Math.min(prev.completed_documents + 1, prev.total_documents);
-        const updated = {
-          ...prev,
-          completed_documents: newCompleted,
-          status: newCompleted >= prev.total_documents ? 'complete' as const : 'processing' as const,
-          documents: prev.documents.map((d, i) => ({
-            ...d,
-            status: i < newCompleted ? 'complete' as const : d.status
-          }))
-        };
+        setBatch(prev => {
+          if (!prev) return prev;
 
-        if (updated.status === 'complete') {
-          clearInterval(interval);
-          setStep('complete');
-          onComplete?.();
-        }
+          const updated: Batch = {
+            ...prev,
+            status: progressData.status,
+            completed_documents: progressData.completed_documents,
+            documents: progressData.documents,
+          };
 
-        return updated;
-      });
-    }, 800);
+          if (updated.status === 'complete' || updated.status === 'failed') {
+            clearInterval(interval);
+            setStep('complete');
+            onComplete?.();
+          }
+
+          return updated;
+        });
+      } catch (error) {
+        console.error('Failed to poll batch progress:', error);
+        clearInterval(interval);
+      }
+    }, 2000);
 
     return () => clearInterval(interval);
   };

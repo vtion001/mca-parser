@@ -7,5 +7,8 @@ export { KeyDetailsPanel } from './KeyDetailsPanel';
 export { ScoreCard } from './ScoreCard';
 export { ScoreDashboard } from './ScoreDashboard';
 export { DocumentLibrary } from './DocumentLibrary';
+export { StatementsView } from './StatementsView';
 export { BatchProcessor } from './BatchProcessor';
 export { ComparativeView } from './ComparativeView';
+export { DocumentDetailPanel } from './DocumentDetailPanel';
+export { ReviewModal } from './ReviewModal';

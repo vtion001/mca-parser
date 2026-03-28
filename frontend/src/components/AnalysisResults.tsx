@@ -28,9 +28,9 @@ export function AnalysisResults({ result }: AnalysisResultsProps) {
                   Beginning Balance
                 </span>
                 <span className="text-2xl font-semibold text-bw-900">
-                  {formatCurrency(result.balances.beginning_balance.amount)}
+                  {formatCurrency(result.balances.beginning_balance?.amount ?? null)}
                 </span>
-                {result.balances.beginning_balance.keyword && (
+                {result.balances.beginning_balance?.keyword && (
                   <span className="text-xs text-bw-400 mt-1">
                     via "{result.balances.beginning_balance.keyword}"
                   </span>
@@ -41,9 +41,9 @@ export function AnalysisResults({ result }: AnalysisResultsProps) {
                   Ending Balance
                 </span>
                 <span className="text-2xl font-semibold text-bw-900">
-                  {formatCurrency(result.balances.ending_balance.amount)}
+                  {formatCurrency(result.balances.ending_balance?.amount ?? null)}
                 </span>
-                {result.balances.ending_balance.keyword && (
+                {result.balances.ending_balance?.keyword && (
                   <span className="text-xs text-bw-400 mt-1">
                     via "{result.balances.ending_balance.keyword}"
                   </span>
@@ -52,28 +52,28 @@ export function AnalysisResults({ result }: AnalysisResultsProps) {
             </div>
 
             {/* Balance Change Indicator */}
-            {result.balances.beginning_balance.amount !== null &&
-              result.balances.ending_balance.amount !== null && (
+            {result.balances.beginning_balance?.amount != null &&
+              result.balances.ending_balance?.amount != null && (
                 <div className="mt-4 pt-4 border-t border-bw-100">
                   <span className="text-xs font-medium text-bw-500 uppercase tracking-wider">
                     Net Change
                   </span>
                   <div className="flex items-center gap-2 mt-1">
-                    {result.balances.ending_balance.amount -
-                      result.balances.beginning_balance.amount >
+                    {(result.balances.ending_balance!.amount -
+                      result.balances.beginning_balance!.amount) >
                     0 ? (
                       <span className="text-lg font-semibold text-green-600">
                         +
                         {formatCurrency(
-                          result.balances.ending_balance.amount -
-                            result.balances.beginning_balance.amount
+                          result.balances.ending_balance!.amount -
+                            result.balances.beginning_balance!.amount
                         )}
                       </span>
                     ) : (
                       <span className="text-lg font-semibold text-red-600">
                         {formatCurrency(
-                          result.balances.ending_balance.amount -
-                            result.balances.beginning_balance.amount
+                          result.balances.ending_balance!.amount -
+                            result.balances.beginning_balance!.amount
                         )}
                       </span>
                     )}
@@ -122,11 +122,11 @@ export function AnalysisResults({ result }: AnalysisResultsProps) {
                     : 'Document May Not Be Valid'}
                 </p>
                 <p className="text-xs text-bw-500 mt-0.5">
-                  {result.ai_analysis.analysis.completeness.is_complete
+                  {result.ai_analysis.analysis.completeness?.is_complete
                     ? 'Document appears complete'
                     : 'Document may be truncated or incomplete'}
-                  {result.ai_analysis.analysis.completeness.concerns.length > 0 &&
-                    `: ${result.ai_analysis.analysis.completeness.concerns.join(', ')}`}
+                  {result.ai_analysis.analysis.completeness?.concerns?.length > 0 &&
+                    `: ${result.ai_analysis.analysis.completeness?.concerns?.join(', ')}`}
                 </p>
               </div>
             </div>

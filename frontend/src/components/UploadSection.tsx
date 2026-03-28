@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef } from 'react';
 import axios from 'axios';
 import { useTheme } from '../hooks/useTheme';
-import { useExtraction } from '../hooks/useExtraction';
+import { useExtractionContext } from '../contexts/ExtractionContext';
 import { ExtractionProgress } from './ExtractionProgress';
 import { MarkdownViewer } from './MarkdownViewer';
 import { KeyDetailsPanel } from './KeyDetailsPanel';
@@ -17,7 +17,7 @@ interface AnalysisResult {
 
 export function UploadSection() {
   const { colors } = useTheme();
-  const { state, startExtraction, reset } = useExtraction();
+  const { state, batchResults, startExtraction, startBatchExtraction, reset } = useExtractionContext();
   const [files, setFiles] = useState<File[]>([]);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -73,7 +73,13 @@ export function UploadSection() {
 
   const handleFullExtract = async () => {
     if (!files.length) return;
-    startExtraction(files[0]);
+
+    if (files.length === 1) {
+      startExtraction(files[0]);
+    } else {
+      // Process all files sequentially with batch extraction
+      await startBatchExtraction(files);
+    }
   };
 
   const handleAnalyze = async () => {
@@ -165,7 +171,7 @@ export function UploadSection() {
                     <svg className="w-4 h-4 text-bw-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
-                    <span className="text-xs font-medium text-bw-700 truncate max-w-[150px]">{f.name}</span>
+                    <span className="text-xs font-medium text-bw-700 truncate max-w-[150px]" title={f.name}>{f.name}</span>
                   </div>
                 ))}
               </div>
@@ -182,7 +188,11 @@ export function UploadSection() {
             disabled={state.status === 'processing'}
             className="px-8 py-3 bg-black text-white text-sm font-semibold rounded-lg transition-all duration-150 hover:bg-bw-800 disabled:opacity-50 disabled:cursor-not-allowed tracking-wide"
           >
-            {state.status === 'processing' ? 'Processing...' : 'Full Extract'}
+            {state.status === 'processing'
+              ? `Processing (${currentFileIndex(state)})...`
+              : files.length === 1
+                ? 'Full Extract'
+                : `Extract All (${files.length})`}
           </button>
           <button
             onClick={handleAnalyze}
@@ -207,10 +217,48 @@ export function UploadSection() {
           stageLabel={state.stageLabel}
           progressPercent={state.progressPercent}
           currentMarkdown={state.currentMarkdown}
+          stage={state.stage}
         />
       )}
 
-      {/* Extraction Results */}
+      {/* Batch Results Summary (shown after batch extraction completes) */}
+      {state.status === 'complete' && batchResults.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-bw-700">
+              Batch Results — {batchResults.filter(r => r.status === 'complete').length}/{batchResults.length} completed
+            </h3>
+          </div>
+          <div className="space-y-2">
+            {batchResults.map((batchResult, i) => (
+              <div
+                key={i}
+                className={`flex items-center gap-3 px-4 py-3 rounded-xl border ${
+                  batchResult.status === 'complete'
+                    ? 'bg-green-50 border-green-200'
+                    : 'bg-red-50 border-red-200'
+                }`}
+              >
+                <span className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-semibold ${
+                  batchResult.status === 'complete' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                }`}>
+                  {batchResult.status === 'complete' ? '✓' : '✗'}
+                </span>
+                <span className="text-sm font-medium text-bw-700 truncate flex-1" title={batchResult.filename}>
+                  {batchResult.filename}
+                </span>
+                {batchResult.result?.document_type && (
+                  <span className="text-xs text-bw-400 capitalize">
+                    {batchResult.result.document_type.type.replace('_', ' ')}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Extraction Results (single file or last result) */}
       {state.status === 'complete' && state.result && (
         <div className="space-y-6">
           <MarkdownViewer markdown={state.result.markdown} />
@@ -275,4 +323,13 @@ export function UploadSection() {
       )}
     </div>
   );
+}
+
+// Helper to extract batch file counter from stageLabel like "Uploading foo.pdf (2/4)..."
+function currentFileIndex(state: { stageLabel: string }): string {
+  const match = state.stageLabel.match(/\((\d+)\/(\d+)\)/);
+  if (match) {
+    return `${match[1]}/${match[2]}`;
+  }
+  return '';
 }

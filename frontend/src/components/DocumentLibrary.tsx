@@ -51,8 +51,7 @@ export function DocumentLibrary({
       setDocuments(response.data.data || response.data);
     } catch (error) {
       console.error('Failed to fetch documents:', error);
-      // Use mock data for demo
-      setDocuments(getMockDocuments());
+      setDocuments([]);
     } finally {
       setLoading(false);
     }
@@ -448,58 +447,3 @@ export function DocumentLibrary({
   );
 }
 
-// Mock data for demo
-function getMockDocuments(): Document[] {
-  return [
-    {
-      id: 1,
-      filename: 'chase_account_nov2024.pdf',
-      status: 'complete',
-      document_type: 'bank_statement',
-      type_confidence: 0.92,
-      balances: { beginning_balance: { amount: 4523.50 }, ending_balance: { amount: 5234.28 } },
-      ai_analysis: { qualification_score: 8 },
-      created_at: '2024-11-30T00:00:00Z'
-    },
-    {
-      id: 2,
-      filename: 'bofa_statements_dec2024.pdf',
-      status: 'complete',
-      document_type: 'bank_statement',
-      type_confidence: 0.89,
-      balances: { beginning_balance: { amount: 2150.00 }, ending_balance: { amount: 1892.45 } },
-      ai_analysis: { qualification_score: 6 },
-      created_at: '2024-12-31T00:00:00Z'
-    },
-    {
-      id: 3,
-      filename: 'receipt_amazon_1234.pdf',
-      status: 'processing',
-      document_type: 'receipt',
-      type_confidence: 0.78,
-      balances: null,
-      ai_analysis: null,
-      created_at: '2025-01-15T00:00:00Z'
-    },
-    {
-      id: 4,
-      filename: 'wells_fargo_oct.pdf',
-      status: 'failed',
-      document_type: 'bank_statement',
-      type_confidence: 0.45,
-      balances: null,
-      ai_analysis: null,
-      created_at: '2024-10-31T00:00:00Z'
-    },
-    {
-      id: 5,
-      filename: 'uber_receipt_jan.pdf',
-      status: 'pending',
-      document_type: 'receipt',
-      type_confidence: null,
-      balances: null,
-      ai_analysis: null,
-      created_at: '2025-01-20T00:00:00Z'
-    },
-  ];
-}
