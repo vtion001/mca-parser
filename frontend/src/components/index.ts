@@ -16,3 +16,13 @@ export { ErrorBoundary } from './ErrorBoundary';
 
 // Statements module
 export * from './statements';
+
+// Review module — selective re-export to avoid collision with statements/ utils
+export type { ReviewModalProps, FilterTab, FilterTabDef, FilterCounts, BalanceSummary, TagEditorModalProps } from './review';
+export { getConfidenceColor } from './review';
+export { ReviewHeader } from './review';
+export { ReviewFilterBar } from './review';
+export { ReviewTransactionRow } from './review';
+export { ReviewEmptyState } from './review';
+export { ReviewFooter } from './review';
+export { TagEditorModal } from './review';
