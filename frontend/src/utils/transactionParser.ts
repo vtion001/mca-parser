@@ -62,12 +62,14 @@ function isSeparatorRow(cells: string[]): boolean {
   return cells.length > 0 && cells.every(cell => /^-{3,}$/.test(cell) || /^:-+$/.test(cell) || /:-?:/.test(cell));
 }
 
-/** "Looks like a date" — handles mm/dd, mm-dd, mm/dd/yyyy, yyyy-mm-dd, MMM DD, YYYY */
+/** "Looks like a date" — handles mm/dd, mm-dd, mm/dd/yyyy, yyyy-mm-dd, MMM DD, YYYY
+ *  Rejects bare mm/dd (2-digit) without year to avoid matching account-summary cells. */
 function looksLikeDate(s: string): boolean {
   const t = s.trim();
-  // Must contain a separator between two number groups (to avoid matching plain 6-digit numbers)
-  // mm/dd or mm-dd (with optional year suffix)
-  if (/^\d{1,2}[\/\-]\d{1,2}([\/\-]\d{2,4})?$/.test(t)) return true;
+  // mm/dd/yyyy or mm-dd-yyyy
+  if (/^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4}$/.test(t)) return true;
+  // mm/dd or mm-dd (2-digit year — common in bank statement transactions)
+  if (/^\d{1,2}[\/\-]\d{1,2}$/.test(t)) return true;
   // yyyy-mm-dd
   if (/^\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2}$/.test(t)) return true;
   // "November 15, 2025" style
@@ -142,13 +144,24 @@ function parseChecksRow(cells: string[]): Array<{ date: string; amount: string; 
 }
 
 /** Parse a 3-column transaction row: [Date] | [Amount] | [Description]
- *  Returns null if the row doesn't look like a transaction. */
+ *  Returns null if the row doesn't look like a transaction.
+ *
+ *  Key insight: in Docling's 3-column format, the SECOND cell is always the amount.
+ *  If the second cell is NOT an amount (e.g., "Beginning Balance"), it's an Account Summary
+ *  row — not a transaction — and must be rejected. */
 function parseTransactionRow(cells: string[], sectionType: SectionType): { date: string; amount: string; description: string; isCredit: boolean } | null {
   if (cells.length < 2) return null;
 
-  // First cell must be a date for transaction rows
+  // First cell must be a date
   const first = cells[0].trim();
   if (!looksLikeDate(first)) return null;
+
+  // CRITICAL: Second cell must be an amount. If it's text like "Beginning Balance",
+  // this is an Account Summary row — not a transaction. Reject it.
+  if (cells.length >= 2) {
+    const second = cells[1].trim();
+    if (second && tryParseAmount(second) === null) return null;
+  }
 
   let amount = '';
   let isCredit = sectionType === 'deposits';
@@ -187,14 +200,17 @@ export function parseTransactionsFromMarkdown(markdown: string): ParsedStatement
   const headingMatch = markdown.match(/##\s*[A-Z][A-Z\s]+\s*[-–]?\s*(\d{6,14})/m);
   if (headingMatch) accountNumber = accountNumber || headingMatch[1];
   const periodMatch = markdown.match(
-    /(?:Statement\s+Period\s+Date|Analysis\s+Period):\s*(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})\s*[-–]\s*(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/m
+    /(?:Statement\s+Period\s+Date|Analysis\s+Period):\s*(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})\s*[-–—]\s*(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/m
   );
   if (periodMatch) statementPeriod = `${periodMatch[1]} - ${periodMatch[2]}`;
 
   // ── Extract balances ─
-  const begBalMatch = markdown.match(/Beginning\s+Balance\s+\$?([\d,]+\.?\d*)/m);
+  // Handle Docling format: "Beginning Balance | $(1,785.93)" or "Beginning Balance | $1,234.56"
+  const begBalMatch = markdown.match(/Beginning\s+Balance\s+\|\s*\$?([\d,]+\.?\d*)/m)
+    ?? markdown.match(/Beginning\s+Balance\s+\$([\d,]+\.?\d*)/m);
   if (begBalMatch) beginningBalance = parseAmount(begBalMatch[1]);
-  const endBalMatch = markdown.match(/Ending\s+Balance\s+\$?([\d,]+\.?\d*)/m);
+  const endBalMatch = markdown.match(/Ending\s+Balance\s+\|\s*\$?([\d,]+\.?\d*)/m)
+    ?? markdown.match(/Ending\s+Balance\s+\$([\d,]+\.?\d*)/m);
   if (endBalMatch) endingBalance = parseAmount(endBalMatch[1]);
 
   // ── Also extract from key-detail markdown tables (Account Summary block) ─
@@ -241,7 +257,10 @@ export function parseTransactionsFromMarkdown(markdown: string): ParsedStatement
     if (isSectionSummaryRow(cells)) continue;
 
     // ── Parse Checks (6-column repeating: Number | Date | Amount × N) ───────
-    if (currentSection === 'checks') {
+    // Detect checks format: first cell is a check number pattern (digits + optional * or i)
+    const firstCell = cells[0]?.trim() ?? '';
+    const isChecksRow = /^\d+\s*\*?\s*i?\s*$/.test(firstCell);
+    if (currentSection === 'checks' || isChecksRow) {
       const parsedChecks = parseChecksRow(cells);
       for (const { date, amount, checkNumber } of parsedChecks) {
         const debit = tryParseAmount(amount);
