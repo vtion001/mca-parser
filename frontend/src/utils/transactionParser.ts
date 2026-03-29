@@ -17,7 +17,7 @@ function parseAmount(raw: string): number | null {
   return isNegative ? -n : n;
 }
 
-// ─── Date Parsing ────────────────────────────────────────────────────────────
+// ─── Date Parsing ───────────────────────────────────────────────────────────
 
 function parseDate(raw: string): string {
   if (!raw || raw.trim() === '') return '';
@@ -40,215 +40,44 @@ function parseDate(raw: string): string {
   return trimmed;
 }
 
-// ─── Noise Filters ───────────────────────────────────────────────────────────
-
-const SECTION_HEADER_KEYWORDS = [
-  'checks', 'withdrawals', 'deposits', 'credits', 'debits', 'balance',
-  'beginning balance', 'ending balance', 'opening balance', 'closing balance',
-  'total', 'subtotal', 'summary', 'beginning', 'ending', 'opening', 'closing',
-  ' withdrawals / debits', ' deposits / credits', 'analysis period',
-  'transactions',
-];
-
-const IS_NOISE_PAYEE = [
-  /^\s*[-_=~]{3,}\s*$/,           // Separator lines: --- or ___ or ===
-  /^\s*[\|\+\\*]{3,}\s*$/,        // | | | or + + + etc.
-  /^\s*[\s\W]*$/,                 // Only symbols / whitespace
-  /^\s*page\s+\d+\s*$/i,         // "Page 1"
-  /^\s*statement\s+period/i,
-  /^\s*account\s+summary/i,
-  /^\s*transaction\s+detail/i,
-  /^\s*balance\s+forward/i,
-  /^\s*analysis period/i,
-  /^\s*standard monthly service charge$/i,
-  /^checks?\s*$/i,
-  /^withdrawals?\s*$/i,
-  /^deposits?\s*$/i,
-  /^credits?\s*$/i,
-  /^debits?\s*$/i,
-  /^ withdrawals \/ debits\s*$/i,
-  /^ deposits \/ credits\s*$/i,
-  /^ ending\s+balance\s*$/i,
-  /^ beginning\s+balance\s*$/i,
-  /^ available\s+balance\s*$/i,
-  /^ indicates gap in check sequence/i,
-  /^ number$/i,
-  /^ date$/i,
-  /^ paid$/i,
-  /^ electronic image$/i,
-  /^ i = electronic image$/i,
-  // "134 items totaling" — section summary rows
-  /^\d+\s+items?\s+totaling/i,
-];
-
-function isNoisePayee(payee: string): boolean {
-  const trimmed = payee.trim().toLowerCase();
-  if (!trimmed) return true;
-  // Empty or pure symbols
-  if (/^[\s\|\-\+=\*]+$/.test(trimmed)) return true;
-  // Pure numeric (like "18273.9", "14154.4" — reference numbers, not amounts)
-  if (/^\d+(\.\d+)?$/.test(trimmed)) return true;
-  // Matches section header keywords at start
-  if (SECTION_HEADER_KEYWORDS.some(kw => trimmed.startsWith(kw))) return true;
-  // Matches any noise pattern
-  if (IS_NOISE_PAYEE.some(re => re.test(trimmed))) return true;
-  // Too short noise
-  if (trimmed.length < 2) return true;
-  return false;
-}
-
-function isNoiseDate(date: string): boolean {
-  const trimmed = date.trim();
-  // Numbers alone (like "38", "134" — page numbers or section counts)
-  if (/^\d+$/.test(trimmed)) return true;
-  // Section names that happen to be matched as dates
-  if (SECTION_HEADER_KEYWORDS.some(kw => trimmed.toLowerCase().includes(kw))) return true;
-  // A date field that's actually a label (e.g. "Number", "Date Paid", "Amount")
-  if (/^(number|date|paid|amount|description|memo|balance|check|chk)\s*$/i.test(trimmed)) return true;
-  // Check number + optional asterisk pattern (e.g. "3650*i", "3670*i") — not a date
-  if (/^\d+\s*\*?\s*i?\s*$/i.test(trimmed)) return true;
-  // "i = Electronic Image" or similar check register notes in date field
-  if (/^=\s*\w+/.test(trimmed)) return true;
-  return false;
-}
-
-// ─── Markdown Table Parser (cell-based, format-agnostic) ──────────────────────
+// ─── Markdown Table Parser (docling-native format) ─────────────────────────────────
+// Docling's export_to_markdown() produces GFM tables where:
+//   - Section headers are rows whose cells contain keywords like "Withdrawals / Debits", "Checks", "Deposits / Credits"
+//   - Transaction rows have format: [Date] | [Amount] | [Description]   (3-column)
+//   - Check rows have format: [Number] | [Date] | [Amount] repeating     (6+ column)
+//   - Summary rows have format: [count] | [section name] | [total amount]  (3-column summary)
 
 type SectionType = 'unknown' | 'withdrawals' | 'deposits' | 'checks';
 
-/** Split a markdown table row into clean cell strings.
- *  Handles:  | A | B | C |   and also:  A | B | C
- *  Leading/trailing pipes are stripped; each cell is individually trimmed. */
+/** Split a markdown table row into clean cell strings. */
 function splitRow(line: string): string[] {
   const trimmed = line.trim();
   if (!trimmed || trimmed === '|') return [];
-  // Strip leading/trailing | then split by |
   const inner = trimmed.replace(/^\||\|$/g, '');
   return inner.split('|').map(c => c.trim()).filter(c => c.length > 0);
 }
 
 /** Is this a GFM table separator row?  e.g.  |---|---|---| */
 function isSeparatorRow(cells: string[]): boolean {
-  return cells.every(cell => /^-{3,}$/.test(cell) || /^:-+$/.test(cell) || /:-?:/.test(cell));
+  return cells.length > 0 && cells.every(cell => /^-{3,}$/.test(cell) || /^:-+$/.test(cell) || /:-?:/.test(cell));
 }
 
-/** Detect section type from raw line text (before splitRow filtering).
- *  Works on both full row text and cell arrays. */
-function detectSectionTypeFromText(text: string): SectionType {
-  const t = text.toLowerCase();
-  if (!t.trim()) return 'unknown';
-
-  // Checks section: "Checks" alone or "Checks  N checks totaling $X"
-  if (/^checks?\b/i.test(t.trim()) && /checks?\s+totaling/i.test(t)) return 'checks';
-  if (/^checks?\s*$/i.test(t.trim())) return 'checks';
-
-  // Withdrawals / Debits section
-  if (/withdrawals?\s*\/?\s*debits?/i.test(t)) return 'withdrawals';
-
-  // Deposits / Credits section
-  if (/deposits?\s*\/?\s*credits?/i.test(t)) return 'deposits';
-
-  // Electronic credits/debits
-  if (/electronic\s*(credits?|debits?)/i.test(t)) {
-    if (/credit/.test(t)) return 'deposits';
-    if (/debit|withdrawal/.test(t)) return 'withdrawals';
-  }
-
-  return 'unknown';
-}
-
-/** Identify which cell is the date, which is the amount (credit or debit),
- *  and which is the description / payee.
- *  Strategy: scan cells; first date-like → date; first $-amount → amount;
- *  remaining text → description. */
-interface ParsedCells {
-  date: string;
-  description: string;
-  amount: string;   // raw amount string e.g. "$1,234.56"
-  isCredit: boolean;
-}
-
-function parseCells(cells: string[], sectionType: SectionType): ParsedCells | null {
-  let date = '';
-  let description = '';
-  let amount = '';
-  let isCredit = false;
-
-  for (const cell of cells) {
-    const t = cell.trim();
-    if (!t) continue;
-
-    // Check if this cell is a date
-    if (!date && looksLikeDate(t)) {
-      date = t;
-      continue;
-    }
-
-    // Check if this cell is a dollar amount
-    const amt = tryParseAmount(t);
-    if (amt !== null && !amount) {
-      amount = t;
-      // Deposits section → credit; Withdrawals → debit; Unknown section:
-      // negative numbers are debits, positive are credits
-      if (sectionType === 'deposits') {
-        isCredit = true;
-      } else if (sectionType === 'withdrawals') {
-        isCredit = false;
-      } else {
-        isCredit = amt >= 0;
-      }
-      continue;
-    }
-
-    // Remaining cells contribute to description
-    if (description) description += ' ' + t;
-    else description = t;
-  }
-
-  if (!date && !amount) return null; // Not a data row
-  return { date, description, amount, isCredit };
-}
-
-/** Parse a checks table row which has 6 columns: Number, Date, Amount, Number, Date, Amount (repeating).
- *  Returns multiple transactions per row. */
-function parseChecksRow(cells: string[]): ParsedCells[] {
-  const results: ParsedCells[] = [];
-  // Must have 6+ cells in groups of 3
-  for (let i = 0; i + 2 < cells.length; i += 3) {
-    const numCell = cells[i]?.trim();
-    const dateCell = cells[i + 1]?.trim();
-    const amtCell = cells[i + 2]?.trim();
-    if (!numCell || !dateCell || !amtCell) continue;
-    // Skip if "Number" header text appears in first cell
-    if (/^number$/i.test(numCell)) continue;
-    // Check number must be mostly digits
-    if (!/^\d+\s*\*?\s*i?\s*$/i.test(numCell)) continue;
-    if (!looksLikeDate(dateCell)) continue;
-    if (tryParseAmount(amtCell) === null) continue;
-    results.push({ date: dateCell, description: `Check ${numCell.replace(/\s+/g, ' ')}`, amount: amtCell, isCredit: false });
-  }
-  return results;
-}
-
-/** "Looks like a date" — mm/dd/yyyy, dd/mm/yyyy, yyyy-mm-dd, mm/dd, or MMM DD, YYYY */
+/** "Looks like a date" — handles mm/dd, mm-dd, mm/dd/yyyy, yyyy-mm-dd, MMM DD, YYYY */
 function looksLikeDate(s: string): boolean {
   const t = s.trim();
-  // mm/dd/yyyy or dd/mm/yyyy or yyyy-mm-dd (with year)
-  if (/^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}$/.test(t)) return true;
+  // Must contain a separator between two number groups (to avoid matching plain 6-digit numbers)
+  // mm/dd or mm-dd (with optional year suffix)
+  if (/^\d{1,2}[\/\-]\d{1,2}([\/\-]\d{2,4})?$/.test(t)) return true;
   // yyyy-mm-dd
   if (/^\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2}$/.test(t)) return true;
-  // mm/dd or dd/mm (standalone 2-field date without year)
-  if (/^\d{1,2}[\/\-]\d{1,2}$/.test(t)) return true;
   // "November 15, 2025" style
   if (/^[A-Za-z]{3,9}\s+\d{1,2},?\s+\d{4}$/.test(t)) return true;
   return false;
 }
 
-/** Try to parse a string as a dollar amount.
- *  Returns the numeric value (negative for debits in parens), or null if not a dollar amount. */
+/** Try to parse a string as a dollar amount. */
 function tryParseAmount(s: string): number | null {
   const t = s.trim();
-  // Must start with $ or be a bare number
   if (!/^\$?[\d,.\-()]+$/.test(t)) return null;
   const cleaned = t.replace(/[$,()]/g, '').trim();
   const isNeg = t.startsWith('(') || t.startsWith('-');
@@ -258,16 +87,117 @@ function tryParseAmount(s: string): number | null {
   return isNeg ? -n : n;
 }
 
+/** Determine section type by scanning ALL cells for section keywords.
+ *  Docling puts section names in the first cell of multi-column rows. */
+function detectSectionType(cells: string[]): SectionType {
+  if (cells.length < 1) return 'unknown';
+  const allText = cells.map(c => c.toLowerCase()).join(' ');
+  if (/checks?\s+totaling/i.test(allText)) return 'checks';
+  if (/^checks?\s*$/i.test(cells[0] ?? '')) return 'checks';
+  if (/withdrawals?\s*\/?\s*debits?/i.test(allText)) return 'withdrawals';
+  if (/deposits?\s*\/?\s*credits?/i.test(allText)) return 'deposits';
+  if (/electronic\s*(credits?|debits?)/i.test(allText)) {
+    if (/credit/.test(allText)) return 'deposits';
+    if (/debit|withdrawal/.test(allText)) return 'withdrawals';
+  }
+  return 'unknown';
+}
+
+/** Is this a column header row? (first cell is "date", "description", etc.) */
+function isColumnHeaderRow(cells: string[]): boolean {
+  if (cells.length < 2) return false;
+  const first = cells[0].toLowerCase().trim();
+  const headerWords = ['date', 'description', 'amount', 'memo', 'balance', 'payee', 'transaction', 'number', 'type'];
+  if (headerWords.some(w => first === w)) return true;
+  // If ALL cells look like short lowercase header labels, skip
+  if (cells.every(c => /^[a-z]{2,12}$/.test(c.trim()))) return true;
+  return false;
+}
+
+/** Is this a section summary/totals row? e.g. "38 checks totaling $122,356.96" */
+function isSectionSummaryRow(cells: string[]): boolean {
+  if (cells.length < 1) return false;
+  const first = cells[0].toLowerCase();
+  const allText = cells.map(c => c.toLowerCase()).join(' ');
+  if (/^\d+\s+checks?\s+totaling/i.test(first)) return true;
+  if (/\d+\s+items?\s+totaling/i.test(allText)) return true;
+  return false;
+}
+
+/** Parse a checks-table row (6+ columns: Number, Date, Amount repeating). */
+function parseChecksRow(cells: string[]): Array<{ date: string; amount: string; checkNumber: string }> {
+  const results: Array<{ date: string; amount: string; checkNumber: string }> = [];
+  for (let i = 0; i + 2 < cells.length; i += 3) {
+    const numCell = cells[i]?.trim() ?? '';
+    const dateCell = cells[i + 1]?.trim() ?? '';
+    const amtCell = cells[i + 2]?.trim() ?? '';
+    if (!numCell || !dateCell || !amtCell) continue;
+    if (/^number$/i.test(numCell)) continue;
+    if (!/^\d+\s*\*?\s*i?\s*$/i.test(numCell)) continue;
+    if (!looksLikeDate(dateCell)) continue;
+    if (tryParseAmount(amtCell) === null) continue;
+    results.push({ date: dateCell, amount: amtCell, checkNumber: numCell.replace(/\s+/g, ' ') });
+  }
+  return results;
+}
+
+/** Parse a 3-column transaction row: [Date] | [Amount] | [Description]
+ *  Returns null if the row doesn't look like a transaction. */
+function parseTransactionRow(cells: string[], sectionType: SectionType): { date: string; amount: string; description: string; isCredit: boolean } | null {
+  if (cells.length < 2) return null;
+
+  // First cell must be a date for transaction rows
+  const first = cells[0].trim();
+  if (!looksLikeDate(first)) return null;
+
+  let amount = '';
+  let isCredit = sectionType === 'deposits';
+  let description = '';
+
+  for (let i = 1; i < cells.length; i++) {
+    const cell = cells[i].trim();
+    if (!cell) continue;
+    const amt = tryParseAmount(cell);
+    if (amt !== null && !amount) {
+      amount = cell;
+      if (sectionType === 'unknown') {
+        isCredit = amt >= 0;
+      }
+    } else {
+      if (description) description += ' ' + cell;
+      else description = cell;
+    }
+  }
+
+  if (!amount) return null;
+  return { date: first, amount, description, isCredit };
+}
+
 export function parseTransactionsFromMarkdown(markdown: string): ParsedStatement {
   const lines = markdown.split('\n');
   const transactions: TransactionRow[] = [];
   let accountNumber = '';
-  let accountName = '';
   let statementPeriod = '';
   let beginningBalance: number | null = null;
   let endingBalance: number | null = null;
 
-  // ─ Metadata: scan all lines for key details ─
+  // ── Extract account number and period from heading lines ──────────────────────
+  const accountMatch = markdown.match(/Account\s+Number:\s*(\d+)/m);
+  if (accountMatch) accountNumber = accountMatch[1];
+  const headingMatch = markdown.match(/##\s*[A-Z][A-Z\s]+\s*[-–]?\s*(\d{6,14})/m);
+  if (headingMatch) accountNumber = accountNumber || headingMatch[1];
+  const periodMatch = markdown.match(
+    /(?:Statement\s+Period\s+Date|Analysis\s+Period):\s*(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})\s*[-–]\s*(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/m
+  );
+  if (periodMatch) statementPeriod = `${periodMatch[1]} - ${periodMatch[2]}`;
+
+  // ── Extract balances ─
+  const begBalMatch = markdown.match(/Beginning\s+Balance\s+\$?([\d,]+\.?\d*)/m);
+  if (begBalMatch) beginningBalance = parseAmount(begBalMatch[1]);
+  const endBalMatch = markdown.match(/Ending\s+Balance\s+\$?([\d,]+\.?\d*)/m);
+  if (endBalMatch) endingBalance = parseAmount(endBalMatch[1]);
+
+  // ── Also extract from key-detail markdown tables (Account Summary block) ─
   const keyDetailRe = /^\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|?\s*$/;
   for (const line of lines) {
     const trimmed = line.trim();
@@ -277,85 +207,54 @@ export function parseTransactionsFromMarkdown(markdown: string): ParsedStatement
       const [, label, value] = m.map((s: string) => s.trim());
       const labelLower = label.toLowerCase();
       if (labelLower.includes('account') && labelLower.includes('number')) {
-        accountNumber = value.replace(/[*]/g, '');
+        accountNumber = accountNumber || value.replace(/[*]/g, '');
       } else if (labelLower.includes('period') || labelLower.includes('statement')) {
-        statementPeriod = value;
+        statementPeriod = statementPeriod || value;
       } else if (labelLower.includes('beginning') || labelLower.includes('opening')) {
-        beginningBalance = parseAmount(value);
+        if (beginningBalance === null) beginningBalance = parseAmount(value);
       } else if (labelLower.includes('ending') || labelLower.includes('closing')) {
-        endingBalance = parseAmount(value);
+        if (endingBalance === null) endingBalance = parseAmount(value);
       }
     }
   }
 
-  // ── Extract account number and period from heading lines ──────────────────────
-  // e.g. "## MORTGAGE FINANCE CHECKING - 2400099108" or "Account Number: 7935054275"
-  const headingMatch = markdown.match(/##\s*[A-Z][A-Z\s]+\s*[-–]?\s*(\d{6,14})/m);
-  if (headingMatch) accountNumber = accountNumber || headingMatch[1];
-  const accountMatch = markdown.match(/Account\s+Number:\s*(\d+)/m);
-  if (accountMatch) accountNumber = accountNumber || accountMatch[1];
-  // Statement period: "Statement Period Date: 10/1/2025 - 10/31/2025" or "Analysis Period: 09/01/25 - 09/30/25"
-  const periodMatch = markdown.match(/(?:Statement\s+Period\s+Date|Analysis\s+Period):\s*(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})\s*[-–]\s*(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/m);
-  if (periodMatch) statementPeriod = statementPeriod || `${periodMatch[1]} - ${periodMatch[2]}`;
-
-  // ── Extract balances from "Beginning Balance $X" and "Ending Balance $Y" patterns ─
-  const begBalMatch = markdown.match(/Beginning\s+Balance\s+\$?([\d,]+\.?\d*)/m);
-  if (begBalMatch && beginningBalance === null) beginningBalance = parseAmount(begBalMatch[1]);
-  const endBalMatch = markdown.match(/Ending\s+Balance\s+\$?([\d,]+\.?\d*)/m);
-  if (endBalMatch && endingBalance === null) endingBalance = parseAmount(endBalMatch[1]);
-
-  // ── PASS 1: Pre-scan lines to build section type map ─────────────────────────
-  // Section headers can be 1-cell rows (trailing empty cells get filtered).
-  // To avoid missing them, we pre-detect section types from raw line text.
-  const sectionMap = new Map<number, SectionType>();
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    const raw = line.replace(/^\s*\|\s*|\s*\|\s*$/g, '').trim(); // strip outer pipes
-    const detected = detectSectionTypeFromText(raw);
-    if (detected !== 'unknown') {
-      sectionMap.set(i, detected);
-    }
-  }
-
-  // ── PASS 2: Parse transactions using section map ──────────────────────────────
+  // ── PASS: Scan lines — identify sections, then parse transactions ─────────────
   let currentSection: SectionType = 'unknown';
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const cells = splitRow(line);
 
-    // Update current section if this line is a section header
-    if (sectionMap.has(i)) {
-      currentSection = sectionMap.get(i)!;
-      continue; // skip the section header row itself
+    if (cells.length < 1) continue;
+    if (isSeparatorRow(cells)) continue;
+
+    // Update current section when we hit a section header
+    const detected = detectSectionType(cells);
+    if (detected !== 'unknown') {
+      currentSection = detected;
+      continue; // skip the header row itself
     }
 
-    // Must have at least 2 cells to be a data row
-    if (cells.length < 2) continue;
-    // Skip GFM separator rows
-    if (isSeparatorRow(cells)) continue;
-    // Skip pure header rows (all cells look like column labels)
+    // Skip column header rows (Date | Amount | Description)
     if (isColumnHeaderRow(cells)) continue;
-    // Skip section summary rows ("16 item(s) totaling $2,288,779.56")
+    // Skip section summary rows (e.g. "38 checks totaling $122,356.96")
     if (isSectionSummaryRow(cells)) continue;
 
-    // Handle checks table specially (6-column repeating format)
+    // ── Parse Checks (6-column repeating: Number | Date | Amount × N) ───────
     if (currentSection === 'checks') {
       const parsedChecks = parseChecksRow(cells);
-      for (const parsed of parsedChecks) {
-        const amount = tryParseAmount(parsed.amount);
-        const debit = amount !== null ? Math.abs(amount) : null;
+      for (const { date, amount, checkNumber } of parsedChecks) {
+        const debit = tryParseAmount(amount);
         if (debit === null) continue;
-        if (parsed.description.replace(/[*_`#\s]/g, '').length < 2) continue;
         transactions.push({
           id: generateId(),
-          date: parseDate(parsed.date),
-          payee: parsed.description.replace(/[*_`#]/g, '').trim(),
-          debit,
+          date: parseDate(date),
+          payee: `Check ${checkNumber}`,
+          debit: Math.abs(debit),
           credit: null,
           balance: null,
           memo: '',
-          checkNumber: extractCheckNumber(parsed.description),
+          checkNumber,
           tags: [],
           isTrue: false,
           isReviewed: false,
@@ -364,23 +263,20 @@ export function parseTransactionsFromMarkdown(markdown: string): ParsedStatement
       continue;
     }
 
-    // Parse 3-column rows (Withdrawals / Deposits)
-    const parsed = parseCells(cells, currentSection);
+    // ── Parse 3-column transaction rows ──────────────────────────────────────
+    const parsed = parseTransactionRow(cells, currentSection);
     if (!parsed) continue;
 
-    // Skip if date or description looks like noise
-    if (isNoiseDate(parsed.date)) continue;
-    if (isNoisePayee(parsed.description)) continue;
-
-    const amount = tryParseAmount(parsed.amount);
-    const debit = parsed.isCredit ? null : (amount !== null ? Math.abs(amount) : null);
-    const credit = parsed.isCredit ? (amount !== null ? Math.abs(amount) : null) : null;
-    const balance = null; // not reliably in 3-col format
-
-    // Reject rows where both debit and credit are null (not a real transaction)
-    if (debit === null && credit === null) continue;
-    // Reject rows with no meaningful description
+    // Skip pure-numeric descriptions (card numbers, reference numbers embedded in OCR)
+    if (/^\d+$/.test(parsed.description.trim())) continue;
+    // Skip rows with description shorter than 2 meaningful chars
     if (parsed.description.replace(/[*_`#\s]/g, '').length < 2) continue;
+
+    const debitAmt = tryParseAmount(parsed.amount);
+    const debit = parsed.isCredit ? null : (debitAmt !== null ? Math.abs(debitAmt) : null);
+    const credit = parsed.isCredit ? (debitAmt !== null ? Math.abs(debitAmt) : null) : null;
+
+    if (debit === null && credit === null) continue;
 
     transactions.push({
       id: generateId(),
@@ -388,7 +284,7 @@ export function parseTransactionsFromMarkdown(markdown: string): ParsedStatement
       payee: parsed.description.replace(/[*_`#]/g, '').trim(),
       debit,
       credit,
-      balance,
+      balance: null,
       memo: '',
       checkNumber: extractCheckNumber(parsed.description),
       tags: [],
@@ -397,7 +293,7 @@ export function parseTransactionsFromMarkdown(markdown: string): ParsedStatement
     });
   }
 
-  // ── Fallback: any 8-14 digit number in the markdown (likely account number) ────
+  // ── Fallback: any 8-14 digit number in the markdown ─────────────────────────
   if (!accountNumber) {
     const rawMatch = markdown.match(/\b(\d{8,14})\b/m);
     if (rawMatch) accountNumber = rawMatch[1];
@@ -405,30 +301,12 @@ export function parseTransactionsFromMarkdown(markdown: string): ParsedStatement
 
   return {
     accountNumber,
-    accountName,
+    accountName: '',
     statementPeriod,
     transactions,
     beginningBalance,
     endingBalance,
   };
-}
-
-function isColumnHeaderRow(cells: string[]): boolean {
-  if (cells.length < 2) return false;
-  // "date", "description", "amount", "memo", "balance" etc as first cell
-  const first = cells[0].toLowerCase().trim();
-  const headerWords = ['date', 'description', 'amount', 'memo', 'balance', 'payee', 'transaction', 'number', 'type'];
-  if (headerWords.some(w => first === w)) return true;
-  // If ALL cells look like short header labels, skip
-  if (cells.every(c => /^[a-z]{2,8}$/.test(c.trim()))) return true;
-  return false;
-}
-
-function isSectionSummaryRow(cells: string[]): boolean {
-  const allText = cells.map(c => c.toLowerCase()).join(' ');
-  if (/\d+\s+items?\s+totaling/i.test(allText)) return true;
-  if (/total/i.test(allText) && /(?:credits?|debits?|withdrawals?|deposits?)/i.test(allText)) return true;
-  return false;
 }
 
 // ─── Auto-tagging ───────────────────────────────────────────────────────────
@@ -439,42 +317,27 @@ export function autoTag(description: string, credit: number | null = null, debit
   const isCredit = credit !== null && credit > 0;
   const isDebit = debit !== null && debit > 0;
 
-  // ─ Wire transfers ─────────────────────────────────────────────
   if (desc.includes('wire from') || desc.includes('wire to') || desc.includes('wire transfer')) {
     tags.push('Wire');
     tags.push('Transfer');
-  }
-  // ─ ACH / electronic transfers ─────────────────────────────────
-  else if (desc.includes('ach') || desc.includes('xfr xfer') || desc.includes('zelle') || desc.includes('direct dep')) {
+  } else if (desc.includes('ach') || desc.includes('xfr xfer') || desc.includes('zelle') || desc.includes('direct dep')) {
     tags.push('Transfer');
-  }
-  // ─ MCA transactions ───────────────────────────────────────────
-  else if (desc.includes('mca') || desc.includes('merchant cash advance')) {
+  } else if (desc.includes('mca') || desc.includes('merchant cash advance')) {
     tags.push('MCA');
-  }
-  // ─ Standard deposits / inflows ────────────────────────────────
-  else if (isCredit || desc.includes('deposit') || desc.includes('refund') || desc.includes('reversal') || desc.includes('correction')) {
+  } else if (isCredit || desc.includes('deposit') || desc.includes('refund') || desc.includes('reversal') || desc.includes('correction')) {
     tags.push('Inflows');
-  }
-  // ─ Standard debits / outflows ─────────────────────────────────
-  else if (isDebit || desc.includes('payment') || desc.includes('fee') || desc.includes('charge')) {
+  } else if (isDebit || desc.includes('payment') || desc.includes('fee') || desc.includes('charge')) {
     tags.push('All Other Debits');
-  }
-  // ─ Catch-all ─────────────────────────────────────────────────
-  else {
+  } else {
     tags.push('Non-Descript Revenue');
   }
 
-  // ─ Risk modifiers ────────────────────────────────────────────
   const amount = credit ?? debit ?? 0;
-  if (Math.abs(amount) > 100_000) {
-    tags.push('Large/Unusual');
-  }
+  if (Math.abs(amount) > 100_000) tags.push('Large/Unusual');
   if (desc.includes('overdraft') || desc.includes('nsf') || desc.includes('returned')) {
     tags.push('Returned Item');
   }
 
-  // Deduplicate
   return [...new Set(tags)];
 }
 

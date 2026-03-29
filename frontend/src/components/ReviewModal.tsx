@@ -113,6 +113,11 @@ export function ReviewModal({ result, onClose }: ReviewModalProps) {
   useEffect(() => {
     if (result.markdown) {
       const parsed = parseTransactionsFromMarkdown(result.markdown);
+      console.log('[ReviewModal] markdown length:', result.markdown.length);
+      console.log('[ReviewModal] parsed transactions:', parsed.transactions.length);
+      if (parsed.transactions.length > 0) {
+        console.log('[ReviewModal] sample txn:', JSON.stringify(parsed.transactions[0]));
+      }
       setStatement(parsed);
       const tagged = parsed.transactions.map(t => ({
         ...t,
