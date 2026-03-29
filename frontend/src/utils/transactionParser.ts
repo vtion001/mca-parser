@@ -72,7 +72,6 @@ export function autoTag(
 export function getTagColor(tag: string): { bg: string; text: string; border: string } {
   const map: Record<string, { bg: string; text: string; border: string }> = {
     'MCA': { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200' },
-    'MCA Related': { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200' },
     'Transfer': { bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200' },
     'Credit Card Payment Processor': {
       bg: 'bg-orange-50',

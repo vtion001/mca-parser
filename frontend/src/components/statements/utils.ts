@@ -55,7 +55,8 @@ export function isValidRow(doc: any): boolean {
   const credits = txn?.total_amount_credits ?? null;
   const debits = txn?.total_amount_debits ?? null;
 
-  // Reject rows with zero or obviously bogus totals (AI hallucination guards)
+  // Reject rows where both credits and debits are zero or negative (AI hallucination)
+  // Single-sided zero/negative (e.g., credits=0, debits>0) can be legitimate
   if (credits !== null && credits <= 0 && debits !== null && debits <= 0) return false;
   // Reject rows where AI returned absurdly large numbers (likely hallucination)
   // Normal business bank accounts rarely exceed $10M in a month
@@ -98,9 +99,11 @@ export function buildRow(doc: any): StatementRow | null {
   const accountType = getFieldValue(details, 'account_type') || 'Bank Account';
 
   let period = getFieldValue(details, 'statement_period');
-  if (!period || period.length > 50) {
+  // Cap at 80 chars to avoid absurdly long display labels; if exceeded,
+  // fall back to the beginning date or a generic label
+  if (!period || period.length > 80) {
     const begDate = getFieldValue(details, 'date') || '';
-    period = (begDate && begDate.length < 50) ? begDate : 'Statement';
+    period = (begDate && begDate.length <= 80) ? begDate : 'Statement';
   }
 
   const confidence = doc.scores?.overall ?? doc.document_type?.confidence ?? 0.85;
