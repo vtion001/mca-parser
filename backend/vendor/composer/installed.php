@@ -1,9 +1,9 @@
 <?php return array(
     'root' => array(
         'name' => 'mca/pdf-scrubber-backend',
-        'pretty_version' => '1.0.0+no-version-set',
-        'version' => '1.0.0.0',
-        'reference' => null,
+        'pretty_version' => 'dev-main',
+        'version' => 'dev-main',
+        'reference' => 'ca3bba7d9eea0f2a0bbda50f8f2ecf20a66ca52e',
         'type' => 'project',
         'install_path' => __DIR__ . '/../../',
         'aliases' => array(),
@@ -467,9 +467,9 @@
             'dev_requirement' => false,
         ),
         'mca/pdf-scrubber-backend' => array(
-            'pretty_version' => '1.0.0+no-version-set',
-            'version' => '1.0.0.0',
-            'reference' => null,
+            'pretty_version' => 'dev-main',
+            'version' => 'dev-main',
+            'reference' => 'ca3bba7d9eea0f2a0bbda50f8f2ecf20a66ca52e',
             'type' => 'project',
             'install_path' => __DIR__ . '/../../',
             'aliases' => array(),

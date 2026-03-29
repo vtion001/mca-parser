@@ -1,0 +1,1 @@
+1774716782a:8:{s:6:"job_id";s:36:"e7cf35dc-d62e-4d30-9681-a12d6ce0ad5d";s:6:"status";s:6:"failed";s:5:"stage";s:6:"failed";s:11:"stage_label";s:6:"Failed";s:16:"progress_percent";i:0;s:16:"current_markdown";N;s:6:"result";N;s:5:"error";s:63:"Extraction failed: 'Page' object has no attribute 'page_images'";}
