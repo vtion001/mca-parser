@@ -172,21 +172,21 @@ function Sparkline({ credits, debits }: { credits: number | null; debits: number
     <div className="flex flex-col items-center">
       <div className="flex items-end gap-[3px] h-12 w-24">
         <div
-          className="flex-1 rounded-t-sm bg-gradient-to-t from-emerald-600 to-emerald-400 animate-[sv-draw_0.6s_cubic-bezier(0.34,1.56,0.64,1)_both]"
+          className="flex-1 rounded-t-sm bg-gradient-to-t from-bw-800 to-bw-400 animate-[sv-draw_0.6s_cubic-bezier(0.34,1.56,0.64,1)_both]"
           style={{ height: creditH, animationDelay: '0ms' }}
         />
         <div
-          className="flex-1 rounded-t-sm bg-gradient-to-t from-bw-800 to-bw-600 animate-[sv-draw_0.6s_cubic-bezier(0.34,1.56,0.64,1)_both]"
+          className="flex-1 rounded-t-sm bg-gradient-to-t from-bw-500 to-bw-300 animate-[sv-draw_0.6s_cubic-bezier(0.34,1.56,0.64,1)_both]"
           style={{ height: debitH, animationDelay: '100ms' }}
         />
       </div>
       <div className="flex items-center gap-3 mt-1.5 text-[10px] font-mono">
         <span className="flex items-center gap-1">
-          <span className="w-2 h-2 rounded-sm bg-gradient-to-t from-emerald-600 to-emerald-400" />
+          <span className="w-2 h-2 rounded-sm bg-gradient-to-t from-bw-800 to-bw-400" />
           <span className="text-bw-400">CR</span>
         </span>
         <span className="flex items-center gap-1">
-          <span className="w-2 h-2 rounded-sm bg-gradient-to-t from-bw-800 to-bw-600" />
+          <span className="w-2 h-2 rounded-sm bg-gradient-to-t from-bw-500 to-bw-300" />
           <span className="text-bw-400">DR</span>
         </span>
       </div>
@@ -369,7 +369,7 @@ export function StatementsView({ result, onReviewStatement }: StatementsViewProp
                 const isReconciles = row.difference !== null && Math.abs(row.difference) < 0.01;
                 const hasNsf = row.nsfCount > 0;
                 const isCurrent = row.id === -1;
-                const diffClass = isReconciles ? 'text-emerald-600' : 'text-amber-600';
+                const diffClass = isReconciles ? 'text-bw-900' : 'text-bw-600';
 
                 return (
                   <div
@@ -378,15 +378,15 @@ export function StatementsView({ result, onReviewStatement }: StatementsViewProp
                       sv-row-animate relative overflow-hidden rounded-xl border
                       transition-all duration-200 hover:shadow-elevated
                       ${isReconciles
-                        ? 'bg-white border-bw-100 hover:border-emerald-200'
-                        : 'bg-white border-amber-200 hover:border-amber-300'
+                        ? 'bg-white border-bw-100 hover:border-bw-300'
+                        : 'bg-white border-bw-200 hover:border-bw-400'
                       }
                     `}
                     style={{ animationDelay: `${idx * 60}ms` }}
                   >
                     {/* Reconciliation status stripe */}
                     <div className={`absolute left-0 top-0 bottom-0 w-1 ${
-                      isReconciles ? 'bg-emerald-500' : 'bg-amber-400'
+                      isReconciles ? 'bg-bw-900' : 'bg-bw-400'
                     }`} />
 
                     <div className="flex items-center gap-4 px-6 py-5 pl-8">
@@ -394,9 +394,9 @@ export function StatementsView({ result, onReviewStatement }: StatementsViewProp
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-3">
                           <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${
-                            isReconciles ? 'bg-emerald-50' : 'bg-amber-50'
+                            isReconciles ? 'bg-bw-100' : 'bg-bw-50'
                           }`}>
-                            <svg className={`w-4 h-4 ${isReconciles ? 'text-emerald-600' : 'text-amber-600'}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <svg className={`w-4 h-4 ${isReconciles ? 'text-bw-900' : 'text-bw-500'}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                               <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" />
                             </svg>
                           </div>
@@ -441,7 +441,7 @@ export function StatementsView({ result, onReviewStatement }: StatementsViewProp
                         <div className="flex items-center gap-4">
                           <div className="flex-1 text-right">
                             <div className="text-[10px] text-bw-400 mb-1">Deposits</div>
-                            <div className="font-mono text-sm font-semibold text-emerald-600">
+                            <div className="font-mono text-sm font-semibold text-bw-800">
                               {fmtMoney(row.totalCredits)}
                             </div>
                             <div className="font-mono text-[11px] text-bw-400 mt-0.5">
@@ -479,10 +479,10 @@ export function StatementsView({ result, onReviewStatement }: StatementsViewProp
                           {/* Status badge */}
                           <div className={`mt-1 px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wide ${
                             isReconciles
-                              ? 'bg-emerald-100 text-emerald-700'
+                              ? 'bg-bw-900 text-white'
                               : hasNsf
-                                ? 'bg-red-100 text-red-700'
-                                : 'bg-amber-100 text-amber-700'
+                                ? 'bg-bw-200 text-bw-900'
+                                : 'bg-bw-100 text-bw-600'
                           }`}>
                             {isReconciles ? 'Reconciled' : hasNsf ? 'NSF Issue' : 'Variance'}
                           </div>
@@ -503,7 +503,7 @@ export function StatementsView({ result, onReviewStatement }: StatementsViewProp
                             transition-all duration-150 shadow-sm
                             ${isReconciles
                               ? 'bg-bw-900 text-white hover:bg-bw-800 active:bg-bw-700'
-                              : 'bg-amber-500 text-white hover:bg-amber-600 active:bg-amber-700'
+                              : 'bg-bw-600 text-white hover:bg-bw-700 active:bg-bw-800'
                             }
                           `}
                         >
@@ -515,7 +515,7 @@ export function StatementsView({ result, onReviewStatement }: StatementsViewProp
                         </button>
                         {hasNsf && (
                           <div className="mt-1.5 text-center">
-                            <span className="inline-flex items-center justify-center min-w-[24px] px-1.5 py-0.5 rounded-full font-mono text-xs font-bold bg-red-50 text-red-600">
+                            <span className="inline-flex items-center justify-center min-w-[24px] px-1.5 py-0.5 rounded-full font-mono text-xs font-bold bg-bw-200 text-bw-900">
                               {row.nsfCount} NSF
                             </span>
                           </div>
@@ -540,17 +540,17 @@ export function StatementsView({ result, onReviewStatement }: StatementsViewProp
               </div>
               <div className="w-px h-4 bg-bw-200" />
               <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                <div className="w-2 h-2 rounded-full bg-bw-900" />
                 <span className="text-xs text-bw-400">Reconciled</span>
-                <span className="text-sm font-mono font-bold text-emerald-600">
+                <span className="text-sm font-mono font-bold text-bw-900">
                   {documents.filter(r => r.difference !== null && Math.abs(r.difference) < 0.01).length}
                 </span>
               </div>
               <div className="w-px h-4 bg-bw-200" />
               <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-amber-500" />
+                <div className="w-2 h-2 rounded-full bg-bw-400" />
                 <span className="text-xs text-bw-400">Variance</span>
-                <span className="text-sm font-mono font-bold text-amber-600">
+                <span className="text-sm font-mono font-bold text-bw-600">
                   {documents.filter(r => r.difference === null || Math.abs(r.difference) >= 0.01).length}
                 </span>
               </div>
@@ -558,9 +558,9 @@ export function StatementsView({ result, onReviewStatement }: StatementsViewProp
                 <>
                   <div className="w-px h-4 bg-bw-200" />
                   <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-red-500" />
+                    <div className="w-2 h-2 rounded-full bg-bw-500" />
                     <span className="text-xs text-bw-400">NSF Issues</span>
-                    <span className="text-sm font-mono font-bold text-red-600">
+                    <span className="text-sm font-mono font-bold text-bw-700">
                       {documents.filter(r => r.nsfCount > 0).length}
                     </span>
                   </div>
