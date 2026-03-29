@@ -21,7 +21,7 @@ export function useExtraction() {
     error?: string;
   }>>([]);
 
-  const pollingRef = useRef<NodeJS.Timeout | null>(null);
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const currentFileIndexRef = useRef<number>(0);
   const remainingFilesRef = useRef<File[]>([]);
 
