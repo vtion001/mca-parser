@@ -63,7 +63,13 @@ export function ReviewFilterBar({
         >
           {editMode ? '✓ Editing' : 'Edit'}
         </button>
-        <button className="px-2.5 py-1 text-[10px] font-semibold text-white bg-emerald-600 rounded-md hover:bg-emerald-700 transition-colors">
+        <button
+          onClick={() => {
+            // TODO: wire to save endpoint or state commit
+            window.alert('Save is not yet connected — tag edits are saved in-memory only.');
+          }}
+          className="px-2.5 py-1 text-[10px] font-semibold text-white bg-emerald-600 rounded-md hover:bg-emerald-700 transition-colors"
+        >
           SAVE
         </button>
       </div>
