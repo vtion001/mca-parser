@@ -111,19 +111,26 @@ export function ReviewModal({ result, onClose }: ReviewModalProps) {
 
   // Parse transactions from markdown on mount
   useEffect(() => {
-    if (result.markdown) {
-      const parsed = parseTransactionsFromMarkdown(result.markdown);
-      console.log('[ReviewModal] markdown length:', result.markdown.length);
-      console.log('[ReviewModal] parsed transactions:', parsed.transactions.length);
-      if (parsed.transactions.length > 0) {
-        console.log('[ReviewModal] sample txn:', JSON.stringify(parsed.transactions[0]));
+    console.log('[ReviewModal] useEffect triggered, markdown length:', result.markdown?.length ?? 'undefined/null');
+    if (result.markdown && result.markdown.length > 0) {
+      try {
+        const parsed = parseTransactionsFromMarkdown(result.markdown);
+        console.log('[ReviewModal] parsed transactions:', parsed.transactions.length);
+        if (parsed.transactions.length > 0) {
+          console.log('[ReviewModal] sample txn:', JSON.stringify(parsed.transactions[0]));
+        }
+        setStatement(parsed);
+        const tagged = parsed.transactions.map(t => ({
+          ...t,
+          tags: autoTag(t.payee, t.credit ?? null, t.debit ?? null),
+        }));
+        setTransactions(tagged);
+      } catch (err) {
+        console.error('[ReviewModal] Error parsing markdown:', err);
       }
-      setStatement(parsed);
-      const tagged = parsed.transactions.map(t => ({
-        ...t,
-        tags: autoTag(t.payee, t.credit ?? null, t.debit ?? null),
-      }));
-      setTransactions(tagged);
+    } else {
+      console.warn('[ReviewModal] result.markdown is empty or undefined, skipping parse');
+      console.warn('[ReviewModal] result keys:', Object.keys(result));
     }
   }, [result.markdown]);
 
