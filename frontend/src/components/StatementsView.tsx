@@ -226,6 +226,17 @@ export function StatementsView({ result, onReviewStatement }: StatementsViewProp
   const [loading, setLoading] = useState(true);
   const [visible, setVisible] = useState(false);
 
+  const handleDelete = async (id: number) => {
+    if (!window.confirm('Delete this statement? This cannot be undone.')) return;
+    try {
+      await axios.delete(`/api/v1/documents/${id}`);
+      setDocuments(prev => prev.filter(d => d.id !== id));
+    } catch (err) {
+      console.error('Failed to delete document:', err);
+      alert('Failed to delete statement. Please try again.');
+    }
+  };
+
   // Fetch stored documents from backend
   useEffect(() => {
     async function fetchDocuments() {
@@ -496,30 +507,41 @@ export function StatementsView({ result, onReviewStatement }: StatementsViewProp
 
                       {/* ── Action ── */}
                       <div className="w-24 text-right">
-                        <button
-                          onClick={() => onReviewStatement?.(row.result)}
-                          className={`
-                            inline-flex items-center gap-2 px-4 py-2.5 text-xs font-semibold rounded-lg
-                            transition-all duration-150 shadow-sm
-                            ${isReconciles
-                              ? 'bg-bw-900 text-white hover:bg-bw-800 active:bg-bw-700'
-                              : 'bg-bw-600 text-white hover:bg-bw-700 active:bg-bw-800'
-                            }
-                          `}
-                        >
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                          </svg>
-                          Review
-                        </button>
-                        {hasNsf && (
-                          <div className="mt-1.5 text-center">
+                        <div className="flex flex-col items-end gap-1.5">
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => onReviewStatement?.(row.result)}
+                              className={`
+                                inline-flex items-center gap-2 px-4 py-2.5 text-xs font-semibold rounded-lg
+                                transition-all duration-150 shadow-sm
+                                ${isReconciles
+                                  ? 'bg-bw-900 text-white hover:bg-bw-800 active:bg-bw-700'
+                                  : 'bg-bw-600 text-white hover:bg-bw-700 active:bg-bw-800'
+                                }
+                              `}
+                            >
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                              </svg>
+                              Review
+                            </button>
+                            <button
+                              onClick={() => handleDelete(row.id)}
+                              className="w-8 h-8 inline-flex items-center justify-center rounded-lg bg-bw-50 text-bw-400 hover:bg-red-50 hover:text-red-600 transition-all duration-150 border border-bw-100 hover:border-red-200"
+                              title="Delete statement"
+                            >
+                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          </div>
+                          {hasNsf && (
                             <span className="inline-flex items-center justify-center min-w-[24px] px-1.5 py-0.5 rounded-full font-mono text-xs font-bold bg-bw-200 text-bw-900">
                               {row.nsfCount} NSF
                             </span>
-                          </div>
-                        )}
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
