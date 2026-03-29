@@ -134,12 +134,14 @@ export function ReviewModal({ result, onClose }: ReviewModalProps) {
     }
   }, [result.markdown]);
 
-  // Close on Escape
+  // Close on Escape — use ref to avoid stale closure (onClose is stable via useCallback in App)
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onCloseRef.current(); };
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
-  }, [onClose]);
+  }, []);
 
   // Lock body scroll
   useEffect(() => {

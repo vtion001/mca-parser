@@ -1,5 +1,5 @@
 import ReactDOM from 'react-dom/client';
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { ThemeProvider } from './hooks/useTheme';
 import { ExtractionProvider, useExtractionContext } from './contexts/ExtractionContext';
 import {
@@ -9,6 +9,7 @@ import {
   StatementsView,
   DocumentDetailPanel,
   ReviewModal,
+  ErrorBoundary,
 } from './components';
 import './styles/globals.css';
 
@@ -20,14 +21,23 @@ function App() {
   const [selectedResult, setSelectedResult] = useState<import('./types/extraction').ExtractionResult | null>(null);
   const { state } = useExtractionContext();
 
+  // ─── Stable callbacks (prevent effect churn and React reconciler instability) ───
+  const handleCloseDetail = useCallback(() => {
+    setSelectedDocumentId(null);
+  }, []);
+
+  const handleCloseReview = useCallback(() => {
+    setSelectedResult(null);
+  }, []);
+
+  const handleReviewStatement = useCallback((result: import('./types/extraction').ExtractionResult) => {
+    setSelectedResult(result);
+  }, []);
+
   const navItems: { id: View; label: string }[] = [
     { id: 'upload', label: 'Upload' },
     { id: 'library', label: 'Statements' },
   ];
-
-  const handleCloseDetail = () => {
-    setSelectedDocumentId(null);
-  };
 
   return (
     <ThemeProvider>
@@ -75,7 +85,7 @@ function App() {
           {activeView === 'library' && (
             <StatementsView
               result={state.result}
-              onReviewStatement={(result) => setSelectedResult(result)}
+              onReviewStatement={handleReviewStatement}
             />
           )}
         </main>
@@ -95,10 +105,24 @@ function App() {
 
       {/* Review Modal — full-screen slide-over for statement details */}
       {selectedResult && (
-        <ReviewModal
-          result={selectedResult}
-          onClose={() => setSelectedResult(null)}
-        />
+        <ErrorBoundary
+          fallback={
+            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-white/90">
+              <div className="text-center">
+                <p className="text-sm text-bw-900 font-semibold mb-1">Review modal failed to load</p>
+                <p className="text-xs text-bw-400 mb-3">Try refreshing the page</p>
+                <button onClick={handleCloseReview} className="px-4 py-2 text-xs font-medium text-white bg-bw-900 rounded-lg">
+                  Close
+                </button>
+              </div>
+            </div>
+          }
+        >
+          <ReviewModal
+            result={selectedResult}
+            onClose={handleCloseReview}
+          />
+        </ErrorBoundary>
       )}
     </ThemeProvider>
   );

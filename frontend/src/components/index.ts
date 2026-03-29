@@ -12,6 +12,7 @@ export { BatchProcessor } from './BatchProcessor';
 export { ComparativeView } from './ComparativeView';
 export { DocumentDetailPanel } from './DocumentDetailPanel';
 export { ReviewModal } from './ReviewModal';
+export { ErrorBoundary } from './ErrorBoundary';
 
 // Statements module
 export * from './statements';
