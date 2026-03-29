@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
-import { MarkdownViewer } from './MarkdownViewer';
-import { KeyDetailsPanel } from './KeyDetailsPanel';
-import { ScoreDashboard } from './ScoreDashboard';
+import { DetailTabNav, type DetailTabId } from './detail/DetailTabNav';
+import { DetailMarkdownTab } from './detail/DetailMarkdownTab';
+import { DetailKeyDetailsTab } from './detail/DetailKeyDetailsTab';
+import { DetailScoresTab } from './detail/DetailScoresTab';
 import { AnalysisResults } from './AnalysisResults';
 import type { ExtractionResult } from '../types/extraction';
 
@@ -35,7 +36,7 @@ export function DocumentDetailPanel({ documentId, onClose }: DocumentDetailPanel
   const [document, setDocument] = useState<DocumentData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'overview' | 'markdown' | 'analysis'>('overview');
+  const [activeTab, setActiveTab] = useState<DetailTabId>('markdown');
 
   useEffect(() => {
     if (!documentId) return;
@@ -91,6 +92,65 @@ export function DocumentDetailPanel({ documentId, onClose }: DocumentDetailPanel
     page_count: document.page_count || 0,
   } : null;
 
+  const renderPiiTab = () => {
+    if (!result?.pii_breakdown) {
+      return (
+        <div className="px-6 py-5">
+          <div className="text-center py-16 text-bw-400 text-sm">
+            No PII breakdown available
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="px-6 py-5">
+        <div className="bg-white rounded-xl border border-bw-100 shadow-card overflow-hidden">
+          <div className="px-6 py-4 border-b border-bw-100">
+            <h3 className="text-sm font-semibold text-bw-700">PII Detection Results</h3>
+          </div>
+          <div className="p-6">
+            <div className="flex flex-wrap gap-3">
+              {result.pii_breakdown.ssn && (
+                <div className={`flex items-center gap-2 px-4 py-2.5 rounded-full text-sm ${
+                  result.pii_breakdown.ssn.found
+                    ? 'bg-red-50 text-red-700 border border-red-200'
+                    : 'bg-gray-50 text-gray-500 border border-gray-200'
+                }`}>
+                  <span className={`w-2.5 h-2.5 rounded-full ${result.pii_breakdown.ssn.found ? 'bg-red-500' : 'bg-gray-400'}`} />
+                  <span className="font-medium">{result.pii_breakdown.ssn.label}</span>
+                  <span className="text-xs opacity-75">{result.pii_breakdown.ssn.found ? 'Found' : 'Not found'}</span>
+                </div>
+              )}
+              {result.pii_breakdown.email && (
+                <div className={`flex items-center gap-2 px-4 py-2.5 rounded-full text-sm ${
+                  result.pii_breakdown.email.found
+                    ? 'bg-red-50 text-red-700 border border-red-200'
+                    : 'bg-gray-50 text-gray-500 border border-gray-200'
+                }`}>
+                  <span className={`w-2.5 h-2.5 rounded-full ${result.pii_breakdown.email.found ? 'bg-red-500' : 'bg-gray-400'}`} />
+                  <span className="font-medium">{result.pii_breakdown.email.label}</span>
+                  <span className="text-xs opacity-75">{result.pii_breakdown.email.found ? 'Found' : 'Not found'}</span>
+                </div>
+              )}
+              {result.pii_breakdown.phone && (
+                <div className={`flex items-center gap-2 px-4 py-2.5 rounded-full text-sm ${
+                  result.pii_breakdown.phone.found
+                    ? 'bg-red-50 text-red-700 border border-red-200'
+                    : 'bg-gray-50 text-gray-500 border border-gray-200'
+                }`}>
+                  <span className={`w-2.5 h-2.5 rounded-full ${result.pii_breakdown.phone.found ? 'bg-red-500' : 'bg-gray-400'}`} />
+                  <span className="font-medium">{result.pii_breakdown.phone.label}</span>
+                  <span className="text-xs opacity-75">{result.pii_breakdown.phone.found ? 'Found' : 'Not found'}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <>
       {/* Backdrop */}
@@ -143,30 +203,7 @@ export function DocumentDetailPanel({ documentId, onClose }: DocumentDetailPanel
         </div>
 
         {/* Tab Bar */}
-        <div className="flex-shrink-0 border-b border-bw-100 px-6">
-          <div className="flex gap-1">
-            {[
-              { id: 'overview' as const, label: 'Overview' },
-              { id: 'markdown' as const, label: 'Extracted Text' },
-              { id: 'analysis' as const, label: 'AI Analysis' },
-            ].map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`px-3 py-3 text-sm font-medium transition-colors relative ${
-                  activeTab === tab.id
-                    ? 'text-bw-900'
-                    : 'text-bw-400 hover:text-bw-600'
-                }`}
-              >
-                {tab.label}
-                {activeTab === tab.id && (
-                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-black" />
-                )}
-              </button>
-            ))}
-          </div>
-        </div>
+        <DetailTabNav activeTab={activeTab} onTabChange={setActiveTab} />
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto">
@@ -194,145 +231,36 @@ export function DocumentDetailPanel({ documentId, onClose }: DocumentDetailPanel
             </div>
           )}
 
-          {!loading && !error && result && document?.status === 'complete' && activeTab === 'overview' && (
-            <div className="px-6 py-5 space-y-5">
-              {/* Balance Summary Strip */}
-              {result.balances && (
-                <div className="bg-bw-50 border border-bw-100 rounded-xl p-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-[10px] font-semibold text-bw-400 uppercase tracking-widest mb-1">Beginning Balance</p>
-                      <p className="text-xl font-semibold text-bw-900 font-mono">
-                        {result.balances.beginning_balance.amount !== null
-                          ? `$${result.balances.beginning_balance.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
-                          : '—'}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-semibold text-bw-400 uppercase tracking-widest mb-1">Ending Balance</p>
-                      <p className="text-xl font-semibold text-bw-900 font-mono">
-                        {result.balances.ending_balance.amount !== null
-                          ? `$${result.balances.ending_balance.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
-                          : '—'}
-                      </p>
-                    </div>
-                  </div>
-                </div>
+          {!loading && !error && result && document?.status === 'complete' && (
+            <>
+              {activeTab === 'markdown' && (
+                <DetailMarkdownTab markdown={result.markdown} />
               )}
 
-              {/* Risk / Score Badge */}
-              {result.ai_analysis?.analysis && (
-                <div className="flex items-center gap-3">
-                  <div className={`px-3 py-1.5 rounded-full text-sm font-semibold ${
-                    result.ai_analysis.analysis.qualification_score >= 7
-                      ? 'bg-green-50 text-green-700 border border-green-200'
-                      : result.ai_analysis.analysis.qualification_score >= 4
-                        ? 'bg-yellow-50 text-yellow-700 border border-yellow-200'
-                        : 'bg-red-50 text-red-700 border border-red-200'
-                  }`}>
-                    Score {result.ai_analysis.analysis.qualification_score}/10
-                  </div>
-                  <div className={`px-3 py-1.5 rounded-full text-sm font-medium ${
-                    result.ai_analysis.analysis.is_valid_document
-                      ? 'bg-green-50 text-green-700 border border-green-200'
-                      : 'bg-red-50 text-red-700 border border-red-200'
-                  }`}>
-                    {result.ai_analysis.analysis.is_valid_document ? 'Valid Document' : 'May Not Be Valid'}
-                  </div>
-                </div>
+              {activeTab === 'key_details' && (
+                <DetailKeyDetailsTab
+                  details={result.key_details}
+                  documentType={result.document_type.type}
+                  typeConfidence={result.document_type.confidence}
+                />
               )}
 
-              {/* Key Details */}
-              {result.key_details.length > 0 && (
-                <div>
-                  <h3 className="text-xs font-semibold text-bw-500 uppercase tracking-wider mb-3">Extracted Fields</h3>
-                  <div className="space-y-2">
-                    {result.key_details.slice(0, 8).map((detail, i) => (
-                      <div key={i} className="flex items-start justify-between gap-3 py-2 border-b border-bw-50 last:border-0">
-                        <span className="text-xs text-bw-400 flex-shrink-0">{detail.label}</span>
-                        <span className="text-xs font-medium text-bw-800 text-right truncate" title={detail.value}>{detail.value}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+              {activeTab === 'scores' && (
+                <DetailScoresTab
+                  scores={result.scores}
+                  pii_breakdown={result.pii_breakdown}
+                  recommendations={result.recommendations}
+                />
               )}
 
-              {/* Scores */}
-              {result.scores && (
-                <div>
-                  <h3 className="text-xs font-semibold text-bw-500 uppercase tracking-wider mb-3">Quality Scores</h3>
-                  <div className="grid grid-cols-3 gap-3">
-                    {[
-                      { label: 'Completeness', value: result.scores.completeness },
-                      { label: 'Quality', value: result.scores.quality },
-                      { label: 'PII Detection', value: result.scores.pii_detection },
-                    ].map(({ label, value }) => (
-                      <div key={label} className="bg-bw-50 border border-bw-100 rounded-lg p-3 text-center">
-                        <p className="text-[10px] text-bw-400 uppercase tracking-wider mb-1">{label}</p>
-                        <p className="text-lg font-semibold text-bw-900">{(value * 10).toFixed(0)}</p>
-                        <div className="mt-1.5 h-1 bg-bw-100 rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-black rounded-full transition-all"
-                            style={{ width: `${value * 100}%` }}
-                          />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+              {activeTab === 'pii' && renderPiiTab()}
+
+              {activeTab === 'ai' && (
+                <div className="px-6 py-5">
+                  <AnalysisResults result={result} />
                 </div>
               )}
-
-              {/* Recommendations */}
-              {result.recommendations.length > 0 && (
-                <div>
-                  <h3 className="text-xs font-semibold text-bw-500 uppercase tracking-wider mb-3">Recommendations</h3>
-                  <ul className="space-y-2">
-                    {result.recommendations.map((rec, i) => (
-                      <li key={i} className="flex items-start gap-2 text-xs text-bw-600">
-                        <span className="w-4 h-4 rounded-full bg-bw-100 text-bw-400 flex items-center justify-center flex-shrink-0 mt-0.5 text-[10px] font-medium">{i + 1}</span>
-                        {'message' in rec ? rec.message : String(rec)}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {/* View Full Analysis Button */}
-              <button
-                onClick={() => setActiveTab('analysis')}
-                className="w-full py-2.5 border-2 border-bw-200 rounded-lg text-sm font-medium text-bw-600 hover:border-bw-400 hover:text-bw-900 transition-colors"
-              >
-                View Full AI Analysis
-              </button>
-            </div>
-          )}
-
-          {!loading && !error && result && activeTab === 'markdown' && (
-            <div className="px-6 py-5">
-              {result.markdown ? (
-                <MarkdownViewer markdown={result.markdown} />
-              ) : (
-                <div className="text-center py-16 text-bw-400 text-sm">
-                  No extracted text available
-                </div>
-              )}
-            </div>
-          )}
-
-          {!loading && !error && result && activeTab === 'analysis' && (
-            <div className="px-6 py-5 space-y-5">
-              <KeyDetailsPanel
-                details={result.key_details}
-                documentType={result.document_type.type}
-                typeConfidence={result.document_type.confidence}
-              />
-              <ScoreDashboard
-                scores={result.scores}
-                pii_breakdown={result.pii_breakdown}
-                recommendations={result.recommendations}
-              />
-              <AnalysisResults result={result} />
-            </div>
+            </>
           )}
         </div>
       </div>
