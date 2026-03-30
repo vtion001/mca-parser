@@ -1529,3 +1529,7 @@ Did you mean one of these?
 [2026-03-30 17:57:29] production.ERROR: Docling service error: {"detail":"Docling service not available"}  
 [2026-03-30 17:59:24] production.ERROR: Docling service error: {"detail":"Docling service not available"}  
 [2026-03-30 18:04:31] production.ERROR: Docling service error: {"detail":"Docling service not available"}  
+[2026-03-30 18:07:05] production.ERROR: Docling service error: {"detail":"Docling service not available"}  
+[2026-03-30 18:59:30] production.ERROR: Docling service exception: cURL error 28: Operation timed out after 180002 milliseconds with 0 bytes received (see https://curl.haxx.se/libcurl/c/libcurl-errors.html) for http://docling:8001/extract  
+[2026-03-30 19:14:26] production.ERROR: Docling service exception: cURL error 52: Empty reply from server (see https://curl.haxx.se/libcurl/c/libcurl-errors.html) for http://docling:8001/extract  
+[2026-03-30 19:17:29] production.ERROR: Docling service exception: cURL error 52: Empty reply from server (see https://curl.haxx.se/libcurl/c/libcurl-errors.html) for http://docling:8001/extract  

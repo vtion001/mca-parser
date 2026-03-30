@@ -110,8 +110,8 @@ async def extract_pdf(file: UploadFile = File(...)) -> models.ExtractResponse:
             if images:
                 ocr_text = await asyncio.to_thread(ocr_mod._ocr_images_sync, tmp_path)
 
-        # Clean up temp file in background
-        asyncio.to_thread(lambda p=tmp_path: Path(p).unlink(missing_ok=True))
+        # Clean up temp file in background (fire-and-forget)
+        asyncio.create_task(asyncio.to_thread(Path(tmp_path).unlink, missing_ok=True))
 
         return models.ExtractResponse(
             success=True,
@@ -131,7 +131,7 @@ async def extract_pdf(file: UploadFile = File(...)) -> models.ExtractResponse:
 
 @app.post("/extract-url", response_model=models.ExtractResponse)
 async def extract_from_url(request: models.UrlExtractRequest) -> models.ExtractResponse:
-    if converter is None:
+    if converter_mod.converter is None:
         raise HTTPException(status_code=503, detail="Docling service not available")
 
     try:
@@ -145,7 +145,7 @@ async def extract_from_url(request: models.UrlExtractRequest) -> models.ExtractR
                 tmp.write(resp.content)
                 tmp.close()
                 try:
-                    result = converter.convert(tmp.name)
+                    result = converter_mod.converter.convert(tmp.name)
                     doc = result.document
                     text = doc.export_to_markdown()
                     page_count = len(result.pages) if result.pages else 1
