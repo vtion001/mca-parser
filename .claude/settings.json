@@ -1,0 +1,35 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "name": "TypeScript type-check",
+        "match": "frontend/src/**/*.ts*",
+        "if": "tool in ['Edit', 'Write']",
+        "run": "cd frontend && npx tsc --noEmit"
+      },
+      {
+        "name": "Laravel artisan verify",
+        "match": "backend/**/*.php",
+        "if": "tool in ['Edit', 'Write']",
+        "run": "cd backend && php artisan",
+        "optional": true
+      }
+    ],
+    "PreToolUse": [
+      {
+        "name": "protect .env files",
+        "match": "**/.env*",
+        "if": "tool in ['Edit', 'Write']",
+        "stop": true,
+        "message": "Editing .env files is not allowed. Environment files contain sensitive configuration and should only be modified through official channels."
+      },
+      {
+        "name": "protect package-lock.json",
+        "match": "**/package-lock.json",
+        "if": "tool in ['Edit', 'Write']",
+        "stop": true,
+        "message": "Directly editing package-lock.json is not allowed. This file should only be modified through 'npm install' to ensure dependency integrity."
+      }
+    ]
+  }
+}

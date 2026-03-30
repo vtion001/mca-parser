@@ -32,4 +32,4 @@ COPY . .
 
 EXPOSE 8001
 
-CMD ["python", "src/server.py"]
+CMD ["python", "-m", "src.server"]

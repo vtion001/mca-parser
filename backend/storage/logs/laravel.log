@@ -1338,3 +1338,35 @@ Stack trace:
 #23 /Users/archerterminez/Desktop/REPOSITORY/MCA_PDF_Scrubber/backend/artisan(12): Illuminate\\Foundation\\Console\\Kernel->handle(Object(Symfony\\Component\\Console\\Input\\ArgvInput), Object(Symfony\\Component\\Console\\Output\\ConsoleOutput))
 #24 {main}
 "} 
+[2026-03-29 22:34:15] local.ERROR: Command "test" is not defined.
+
+Did you mean one of these?
+    make:test
+    schedule:test {"exception":"[object] (Symfony\\Component\\Console\\Exception\\CommandNotFoundException(code: 0): Command \"test\" is not defined.
+
+Did you mean one of these?
+    make:test
+    schedule:test at /Users/archerterminez/Desktop/REPOSITORY/MCA_PDF_Scrubber/backend/vendor/symfony/console/Application.php:759)
+[stacktrace]
+#0 /Users/archerterminez/Desktop/REPOSITORY/MCA_PDF_Scrubber/backend/vendor/symfony/console/Application.php(298): Symfony\\Component\\Console\\Application->find('test')
+#1 /Users/archerterminez/Desktop/REPOSITORY/MCA_PDF_Scrubber/backend/vendor/symfony/console/Application.php(195): Symfony\\Component\\Console\\Application->doRun(Object(Symfony\\Component\\Console\\Input\\ArgvInput), Object(Symfony\\Component\\Console\\Output\\ConsoleOutput))
+#2 /Users/archerterminez/Desktop/REPOSITORY/MCA_PDF_Scrubber/backend/vendor/laravel/framework/src/Illuminate/Foundation/Console/Kernel.php(198): Symfony\\Component\\Console\\Application->run(Object(Symfony\\Component\\Console\\Input\\ArgvInput), Object(Symfony\\Component\\Console\\Output\\ConsoleOutput))
+#3 /Users/archerterminez/Desktop/REPOSITORY/MCA_PDF_Scrubber/backend/artisan(12): Illuminate\\Foundation\\Console\\Kernel->handle(Object(Symfony\\Component\\Console\\Input\\ArgvInput), Object(Symfony\\Component\\Console\\Output\\ConsoleOutput))
+#4 {main}
+"} 
+[2026-03-29 22:34:15] local.ERROR: Command "test" is not defined.
+
+Did you mean one of these?
+    make:test
+    schedule:test {"exception":"[object] (Symfony\\Component\\Console\\Exception\\CommandNotFoundException(code: 0): Command \"test\" is not defined.
+
+Did you mean one of these?
+    make:test
+    schedule:test at /Users/archerterminez/Desktop/REPOSITORY/MCA_PDF_Scrubber/backend/vendor/symfony/console/Application.php:759)
+[stacktrace]
+#0 /Users/archerterminez/Desktop/REPOSITORY/MCA_PDF_Scrubber/backend/vendor/symfony/console/Application.php(298): Symfony\\Component\\Console\\Application->find('test')
+#1 /Users/archerterminez/Desktop/REPOSITORY/MCA_PDF_Scrubber/backend/vendor/symfony/console/Application.php(195): Symfony\\Component\\Console\\Application->doRun(Object(Symfony\\Component\\Console\\Input\\ArgvInput), Object(Symfony\\Component\\Console\\Output\\ConsoleOutput))
+#2 /Users/archerterminez/Desktop/REPOSITORY/MCA_PDF_Scrubber/backend/vendor/laravel/framework/src/Illuminate/Foundation/Console/Kernel.php(198): Symfony\\Component\\Console\\Application->run(Object(Symfony\\Component\\Console\\Input\\ArgvInput), Object(Symfony\\Component\\Console\\Output\\ConsoleOutput))
+#3 /Users/archerterminez/Desktop/REPOSITORY/MCA_PDF_Scrubber/backend/artisan(12): Illuminate\\Foundation\\Console\\Kernel->handle(Object(Symfony\\Component\\Console\\Input\\ArgvInput), Object(Symfony\\Component\\Console\\Output\\ConsoleOutput))
+#4 {main}
+"} 
