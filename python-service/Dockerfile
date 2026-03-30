@@ -8,7 +8,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy only requirements first for better layer caching
-COPY python-service/requirements.txt .
+COPY requirements.txt .
 
 # Pre-install CPU-only torch first (much smaller than CUDA version)
 RUN pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu \
@@ -28,7 +28,7 @@ RUN pip install --no-cache-dir --break-system-packages \
     --timeout=600
 
 # Copy application code
-COPY python-service/ .
+COPY . .
 
 EXPOSE 8001
 
