@@ -107,7 +107,7 @@ services:
       - mysql_data:/var/lib/mysql
     networks:
       - mca-network
-    health_check:
+    healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 10s
       timeout: 5s
