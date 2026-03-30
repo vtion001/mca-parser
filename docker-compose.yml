@@ -31,6 +31,7 @@ services:
     environment:
       - APP_ENV=production
       - APP_DEBUG=false
+      - DB_CONNECTION=mysql
       - DB_HOST=mysql
       - DB_PORT=3306
       - DB_DATABASE=mca_pdf_scrubber
@@ -38,6 +39,8 @@ services:
       - DB_PASSWORD=mca_secret
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - CACHE_DRIVER=redis
+      - QUEUE_CONNECTION=redis
       - DOCLING_SERVICE_URL=http://docling:8001
     volumes:
       - ./backend:/var/www/html
@@ -61,6 +64,7 @@ services:
     environment:
       - APP_ENV=production
       - APP_DEBUG=false
+      - DB_CONNECTION=mysql
       - DB_HOST=mysql
       - DB_PORT=3306
       - DB_DATABASE=mca_pdf_scrubber
@@ -68,6 +72,8 @@ services:
       - DB_PASSWORD=mca_secret
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - CACHE_DRIVER=redis
+      - QUEUE_CONNECTION=redis
       - DOCLING_SERVICE_URL=http://docling:8001
     volumes:
       - ./backend:/var/www/html
@@ -81,8 +87,6 @@ services:
     networks:
       - mca-network
     restart: unless-stopped
-    deploy:
-      replicas: 0
 
   # Python Docling service for PDF text extraction
   docling:

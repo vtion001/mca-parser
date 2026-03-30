@@ -18,8 +18,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from . import config
 from . import models
-from .converter import converter, init_converter, _convert_docling
-from .ocr import ocr_reader, init_ocr, _extract_images, _ocr_images_sync
+from . import converter as converter_mod
+from . import ocr as ocr_mod
 
 
 # ─── Global singletons (initialized in lifespan) ──────────────────────────────
@@ -32,8 +32,8 @@ async def lifespan(app: FastAPI):
     """Initialize on startup, clean up on shutdown — one per worker process."""
     global _io_executor, _cpu_executor
 
-    init_converter()
-    init_ocr()
+    converter_mod.init_converter()
+    ocr_mod.init_ocr()
 
     _io_executor = ThreadPoolExecutor(max_workers=config.IO_THREADS, thread_name_prefix="io-")
     _cpu_executor = ThreadPoolExecutor(max_workers=config.CPU_THREADS, thread_name_prefix="cpu-")
@@ -79,8 +79,8 @@ async def health_check() -> models.HealthResponse:
     return models.HealthResponse(
         status="healthy",
         device=config.get_device(),
-        docling_available=converter is not None,
-        ocr_available=ocr_reader is not None,
+        docling_available=converter_mod.converter is not None,
+        ocr_available=ocr_mod.ocr_reader is not None,
         workers=config.WORKERS,
     )
 
@@ -90,7 +90,7 @@ async def extract_pdf(file: UploadFile = File(...)) -> models.ExtractResponse:
     if not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="File must be a PDF")
 
-    if converter is None:
+    if converter_mod.converter is None:
         raise HTTPException(status_code=503, detail="Docling service not available")
 
     contents = await file.read()
@@ -101,14 +101,14 @@ async def extract_pdf(file: UploadFile = File(...)) -> models.ExtractResponse:
 
         # Run docling conversion in CPU thread pool (blocks thread, not event loop)
         # This allows the event loop to accept other requests while docling runs
-        text, page_count = await asyncio.to_thread(_convert_docling, tmp_path)
+        text, page_count = await asyncio.to_thread(converter_mod._convert_docling, tmp_path)
 
         # Smart OCR: extract images with fitz and only run OCR if images were found
         ocr_text = ""
-        if ocr_reader:
-            images = await asyncio.to_thread(_extract_images, tmp_path)
+        if ocr_mod.ocr_reader:
+            images = await asyncio.to_thread(ocr_mod._extract_images, tmp_path)
             if images:
-                ocr_text = await asyncio.to_thread(_ocr_images_sync, tmp_path)
+                ocr_text = await asyncio.to_thread(ocr_mod._ocr_images_sync, tmp_path)
 
         # Clean up temp file in background
         asyncio.to_thread(lambda p=tmp_path: Path(p).unlink(missing_ok=True))
@@ -192,10 +192,10 @@ if __name__ == "__main__":
     print(f"Starting Docling+OCR service on device: {config.get_device()}")
     print(f"Using {config.WORKERS} workers, io_threads={config.IO_THREADS}, cpu_threads={config.CPU_THREADS}")
     uvicorn.run(
-        "server:app",
+        "src.server:app",
         host="0.0.0.0",
         port=int(os.environ.get("DOCLING_PORT", 8001)),
-        workers=config.WORKERS,
+        workers=1,
         loop="uvloop",
         limit_concurrency=10,
         backlog=256,

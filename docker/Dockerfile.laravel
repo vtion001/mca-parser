@@ -16,7 +16,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Install PHP extensions
-RUN docker-php-ext-install mbstring exif pcntl bcmath gd sockets
+RUN docker-php-ext-install mbstring exif pcntl bcmath gd sockets pdo pdo_mysql
 
 # Install Redis extension
 RUN pecl install redis && docker-php-ext-enable redis
@@ -37,7 +37,8 @@ COPY backend/ .
 RUN php artisan key:generate --force
 RUN php artisan config:cache --force 2>/dev/null || true
 
-# Setup nginx
+# Setup nginx - remove default site first
+RUN rm -f /etc/nginx/sites-enabled/default
 COPY docker/laravel/nginx.conf /etc/nginx/conf.d/default.conf
 
 # Setup supervisor for PHP-FPM + Nginx
