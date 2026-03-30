@@ -194,7 +194,7 @@ if __name__ == "__main__":
     uvicorn.run(
         "server:app",
         host="0.0.0.0",
-        port=int(os.environ.get("DOCLING_PORT", 8003)),
+        port=int(os.environ.get("DOCLING_PORT", 8001)),
         workers=config.WORKERS,
         loop="uvloop",
         limit_concurrency=10,

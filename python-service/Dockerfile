@@ -14,17 +14,9 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu \
     torch torchvision --timeout=300
 
-# Install remaining dependencies
+# Install remaining dependencies from requirements.txt
 RUN pip install --no-cache-dir --break-system-packages \
-    fastapi>=0.109.0 \
-    uvicorn[standard]>=0.27.0 \
-    python-multipart>=0.0.6 \
-    httpx>=0.26.0 \
-    pydantic>=2.5.0
-
-# Install docling separately (it's huge, handle with care)
-RUN pip install --no-cache-dir --break-system-packages \
-    docling>=2.0.0 \
+    -r requirements.txt \
     --timeout=600
 
 # Copy application code
