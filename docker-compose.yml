@@ -42,6 +42,7 @@ services:
       - CACHE_DRIVER=redis
       - QUEUE_CONNECTION=redis
       - DOCLING_SERVICE_URL=http://docling:8001
+      - OPENROUTER_API_KEY=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
     volumes:
       - ./backend:/var/www/html
     depends_on:
@@ -75,6 +76,7 @@ services:
       - CACHE_DRIVER=redis
       - QUEUE_CONNECTION=redis
       - DOCLING_SERVICE_URL=http://docling:8001
+      - OPENROUTER_API_KEY=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
     volumes:
       - ./backend:/var/www/html
     depends_on:

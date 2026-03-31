@@ -101,17 +101,11 @@ abstract class BaseAIService
     ): array {
         $hasSsn = preg_match('/\d{3}-\d{2}-\d{4}/', $markdown);
 
-        $totalCredits = 0;
-        $totalDebits = 0;
-        preg_match_all('/\$?(-?)\d{1,3}(?:,\d{3})*(?:\.\d{2})?/', $markdown, $amounts);
-        foreach ($amounts[0] as $amount) {
-            $value = (float) preg_replace('/[$,]/', '', $amount);
-            if ($value > 0) {
-                $totalCredits += $value;
-            } else {
-                $totalDebits += abs($value);
-            }
-        }
+        // Don't attempt to sum dollar amounts from markdown - the regex matches
+        // table headers, balance figures, and other non-transaction amounts,
+        // producing unrealistic totals. Return null for transaction totals instead.
+        $totalCredits = null;
+        $totalDebits = null;
 
         return [
             'success' => false,
@@ -132,8 +126,8 @@ abstract class BaseAIService
                 'transaction_summary' => [
                     'credit_count' => null,
                     'debit_count' => null,
-                    'total_amount_credits' => $totalCredits > 0 ? round($totalCredits, 2) : null,
-                    'total_amount_debits' => $totalDebits > 0 ? round($totalDebits, 2) : null,
+                    'total_amount_credits' => $totalCredits,
+                    'total_amount_debits' => $totalDebits,
                 ],
                 'risk_indicators' => [
                     'has_large_unusual_transactions' => false,
