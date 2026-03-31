@@ -9,10 +9,16 @@ services:
     depends_on:
       - frontend
       - laravel
-      - docling
+      - docling-lb
     networks:
       - mca-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     deploy:
       resources:
         limits:
@@ -26,6 +32,12 @@ services:
     networks:
       - mca-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     deploy:
       resources:
         limits:
@@ -49,7 +61,7 @@ services:
       - REDIS_PORT=6379
       - CACHE_DRIVER=redis
       - QUEUE_CONNECTION=redis
-      - DOCLING_SERVICE_URL=http://docling:8001
+      - DOCLING_SERVICE_URL=http://docling-lb:8001
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:?OPENROUTER_API_KEY is required}
     volumes:
       - ./backend:/var/www/html
@@ -58,22 +70,30 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      docling:
+      docling-lb:
         condition: service_healthy
     networks:
       - mca-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
     deploy:
       resources:
         limits:
           memory: 512M
 
-  # Laravel queue worker
+  # Laravel queue workers - scaled via --scale flag or Swarm
+  # To scale: docker-compose up -d --scale laravel-worker=10
+  # Or for Swarm: docker stack deploy -c docker-compose.yml mca
   laravel-worker:
     build:
       context: .
       dockerfile: docker/Dockerfile.laravel
-    command: php artisan queue:work --tries=1 --timeout=300 --sleep=3
+    command: supervisord -c /etc/supervisor/supervisord.conf
     environment:
       - APP_ENV=production
       - APP_DEBUG=false
@@ -87,16 +107,17 @@ services:
       - REDIS_PORT=6379
       - CACHE_DRIVER=redis
       - QUEUE_CONNECTION=redis
-      - DOCLING_SERVICE_URL=http://docling:8001
+      - DOCLING_SERVICE_URL=http://docling-lb:8001
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:?OPENROUTER_API_KEY is required}
     volumes:
       - ./backend:/var/www/html
+      - ./docker/laravel/supervisord.conf:/etc/supervisor/supervisord.conf:ro
     depends_on:
       mysql:
         condition: service_healthy
       redis:
         condition: service_healthy
-      docling:
+      docling-lb:
         condition: service_healthy
     networks:
       - mca-network
@@ -106,8 +127,117 @@ services:
         limits:
           memory: 512M
 
-  # Python Docling service for PDF text extraction
-  docling:
+  # Docling load balancer - nginx distributing to 5 docling replicas
+  docling-lb:
+    image: nginx:alpine
+    volumes:
+      - ./docker/nginx-conf/docling-lb.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - mca-network
+    depends_on:
+      - docling-1
+      - docling-2
+      - docling-3
+      - docling-4
+      - docling-5
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+
+  # Docling replica 1
+  docling-1:
+    build:
+      context: ./python-service
+      dockerfile: Dockerfile
+    environment:
+      - PYTHONUNBUFFERED=1
+    networks:
+      - mca-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+
+  # Docling replica 2
+  docling-2:
+    build:
+      context: ./python-service
+      dockerfile: Dockerfile
+    environment:
+      - PYTHONUNBUFFERED=1
+    networks:
+      - mca-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+
+  # Docling replica 3
+  docling-3:
+    build:
+      context: ./python-service
+      dockerfile: Dockerfile
+    environment:
+      - PYTHONUNBUFFERED=1
+    networks:
+      - mca-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+
+  # Docling replica 4
+  docling-4:
+    build:
+      context: ./python-service
+      dockerfile: Dockerfile
+    environment:
+      - PYTHONUNBUFFERED=1
+    networks:
+      - mca-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+
+  # Docling replica 5
+  docling-5:
     build:
       context: ./python-service
       dockerfile: Dockerfile

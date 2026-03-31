@@ -28,7 +28,7 @@ Browser → nginx:8000 → React (frontend) or Laravel (API)
 - **Frontend:** React 18 + TypeScript + Tailwind CSS
 - **Backend:** Laravel 11 (PHP 8.2+) + MySQL 8.0 + Redis
 - **PDF Extraction:** Python Docling service (FastAPI + docling library + EasyOCR)
-- **AI Analysis:** MiniMaxService / OpenRouterService (extend BaseAIService)
+- **AI Analysis:** OpenRouterService (extends BaseAIService) using Google Gemini 3.1 Pro for document analysis
 
 ## Commands
 
@@ -74,7 +74,7 @@ python src/server.py
 - **DoclingService.php** - HTTP client to Python Docling service (600s timeout for large PDFs)
 - **PdfAnalyzerService.php** - Regex-based PII detection (SSN, credit cards, emails, phones, dates)
 - **BaseAIService.php** - Abstract base for AI document analysis; provides fallback analysis when API unavailable
-- **MiniMaxService.php / OpenRouterService.php** - Concrete AI service implementations
+- **OpenRouterService.php** - OpenRouter AI service (Google Gemini 3.1 Pro)
 - **BalanceExtractorService.php** - Extracts balance figures from documents
 - **DocumentTypeDetector.php** - Classifies document types
 
@@ -130,3 +130,42 @@ Required environment variables for Docker Compose (set in `.env` or shell):
 | `MYSQL_ROOT_PASSWORD` | Yes | MySQL root password |
 | `DB_DATABASE` | No | Database name (default: `mca_pdf_scrubber`) |
 | `DB_USERNAME` | No | Database username (default: `mca`) |
+
+## Development Workflow
+
+### Before Completing Implementation
+1. Run `/code-review:code-review` to check production readiness
+2. Fix any issues flagged with confidence >= 75
+3. Update this CLAUDE.md if new patterns, services, or architecture are introduced
+
+### Custom Agents
+
+| Agent | File | Purpose |
+|-------|------|---------|
+| `code-reviewer` | `.claude/agents/code-reviewer.md` | Specialized reviewer for security, API contracts, error handling, resource management, and type safety |
+
+### Custom Skills
+
+| Skill | File | Purpose |
+|-------|------|---------|
+| `pr-check` | `.claude/skills/pr-check/SKILL.md` | PR readiness checklist |
+| `setup-dev` | `.claude/skills/setup-dev/SKILL.md` | Development environment setup |
+
+## Production Readiness Checklist
+
+Before deploying, verify:
+
+- [x] No hardcoded secrets (use environment variables)
+- [x] All services have health checks
+- [x] Resource limits set on all containers
+- [x] Cache has stampede protection and graceful fallback
+- [x] Prometheus metrics properly observed on all endpoints
+- [x] `deploy.replicas` removed, use `--scale` flag for standalone Docker Compose
+- [ ] AccountMiddleware has user authentication (requires User model + auth system)
+- [ ] AccountMiddleware has user-account ownership validation (requires User model)
+
+## Known Limitations
+
+1. **AccountMiddleware** requires a User/authentication system to be implemented for full multi-tenant security. Currently supports account isolation via `X-Account-ID` header validation only.
+
+2. **Scaling workers**: Use `docker-compose up -d --scale laravel-worker=10` for standalone Docker Compose. For Swarm, use `docker stack deploy`.

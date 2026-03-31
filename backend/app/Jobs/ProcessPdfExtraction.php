@@ -50,6 +50,31 @@ class ProcessPdfExtraction implements ShouldQueue
         try {
             $this->updateProgress('extracting', 'Extracting text from PDF...', 10);
 
+            // Check cache with stampede protection using lock
+            $contentHash = $this->getContentHash();
+            $cacheKey = "pdf_cache_{$contentHash}";
+
+            try {
+                $lock = Cache::lock("lock_{$cacheKey}", 30);
+
+                if ($lock->get()) {
+                    // Double-check cache inside lock
+                    if ($cached = Cache::get($cacheKey)) {
+                        $this->updateProgress('cache_hit', 'Using cached result...', 100);
+                        $this->handleCachedResult($cached);
+                        $lock->release();
+                        return;
+                    }
+                    $lock->release();
+                }
+            } catch (\Exception $e) {
+                // Lock acquisition failed, continue without cache protection
+                Log::warning('Cache lock failed, proceeding without cache', [
+                    'cache_key' => $cacheKey,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+
             // Mark document as processing if we have a document ID
             if ($this->documentId) {
                 $document = Document::find($this->documentId);
@@ -120,6 +145,9 @@ class ProcessPdfExtraction implements ShouldQueue
 
             // Store in Cache (for frontend polling compatibility)
             Cache::put("extraction_result_{$this->jobId}", $result, now()->addHours(24));
+
+            // Store in PDF content cache for future identical PDFs
+            $this->storeInCache($contentHash, $result);
 
             // Store in database if we have a document ID
             if ($this->documentId) {
@@ -244,5 +272,85 @@ class ProcessPdfExtraction implements ShouldQueue
         }
 
         return $detected;
+    }
+
+    /**
+     * Calculate content hash from file path for cache key
+     */
+    private function getContentHash(): string
+    {
+        // File must exist before we can hash it
+        if (!file_exists($this->filePath)) {
+            throw new \RuntimeException("PDF file not found: {$this->filePath}");
+        }
+
+        return md5_file($this->filePath);
+    }
+
+    /**
+     * Handle cached extraction result
+     */
+    private function handleCachedResult(array $cached): void
+    {
+        $result = $cached['result'] ?? [];
+        $result['cached'] = true;
+
+        // Store in Cache for frontend polling
+        Cache::put("extraction_result_{$this->jobId}", $result, now()->addHours(24));
+
+        // Store in database if we have a document ID
+        if ($this->documentId) {
+            $document = Document::find($this->documentId);
+            if ($document) {
+                $document->markAsComplete([
+                    'document_type' => $result['document_type'] ?? null,
+                    'markdown' => $result['markdown'] ?? null,
+                    'key_details' => $result['key_details'] ?? null,
+                    'scores' => $result['scores'] ?? null,
+                    'pii_breakdown' => $result['pii_breakdown'] ?? null,
+                    'recommendations' => $result['recommendations'] ?? null,
+                    'balances' => $result['balances'] ?? null,
+                    'ai_analysis' => $result['ai_analysis'] ?? null,
+                    'page_count' => $result['page_count'] ?? null,
+                ]);
+            }
+        }
+
+        // Update batch progress if we have a batch ID
+        if ($this->batchId) {
+            $batch = \App\Models\Batch::find($this->batchId);
+            if ($batch) {
+                $batch->incrementCompleted();
+            }
+        }
+
+        $this->updateProgressComplete($result);
+    }
+
+    /**
+     * Store result in cache for future use
+     */
+    private function storeInCache(string $contentHash, array $result): void
+    {
+        $cacheKey = "pdf_cache_{$contentHash}";
+
+        try {
+            $lock = Cache::lock("lock_{$cacheKey}", 30);
+
+            if ($lock->get()) {
+                Cache::put($cacheKey, [
+                    'content_hash' => $contentHash,
+                    'result' => $result,
+                    'cached_at' => now()->toIso8601String(),
+                ], now()->addDays(7)); // Cache for 7 days
+                $lock->release();
+            }
+        } catch (\Exception $e) {
+            // Cache store failed, log but don't fail the job
+            Log::warning('Failed to store PDF in cache', [
+                'cache_key' => $cacheKey,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 }

@@ -6,6 +6,7 @@ Optimized for throughput with async thread-pool offloading and smart OCR gating.
 """
 
 import asyncio
+import time
 from contextlib import asynccontextmanager
 import os
 import tempfile
@@ -15,12 +16,43 @@ from typing import Optional
 
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
 
 from . import config
 from . import models
 from . import converter as converter_mod
 from . import ocr as ocr_mod
 
+
+# ─── Prometheus Metrics ─────────────────────────────────────────────────────────
+REQUEST_COUNT = Counter(
+    'docling_extraction_total',
+    'Total PDF extractions',
+    ['status']  # success, failure
+)
+
+REQUEST_DURATION = Histogram(
+    'docling_extraction_duration_seconds',
+    'PDF extraction duration',
+    buckets=[1, 5, 10, 30, 60, 120, 300, 600]
+)
+
+PDF_PAGE_COUNT = Histogram(
+    'docling_pdf_pages',
+    'Number of pages in processed PDFs',
+    buckets=[1, 2, 5, 10, 20, 50, 100]
+)
+
+QUEUE_DEPTH = Gauge(
+    'docling_queue_depth',
+    'Current queue depth (active extractions)'
+)
+
+OCR_COUNT = Counter(
+    'docling_ocr_total',
+    'Total OCR extractions',
+    ['status']  # success, failure, skipped
+)
 
 # ─── Global singletons (initialized in lifespan) ──────────────────────────────
 _io_executor: Optional[ThreadPoolExecutor] = None
@@ -72,6 +104,14 @@ def _write_temp_file(contents: bytes) -> str:
     return tmp.name
 
 
+# ─── Metrics Endpoint ──────────────────────────────────────────────────────────
+
+@app.get("/metrics")
+async def metrics():
+    """Prometheus metrics endpoint."""
+    return generate_latest(), 200, {'Content-Type': CONTENT_TYPE_LATEST}
+
+
 # ─── API Endpoints ────────────────────────────────────────────────────────────
 
 @app.get("/health")
@@ -94,6 +134,9 @@ async def extract_pdf(file: UploadFile = File(...)) -> models.ExtractResponse:
         raise HTTPException(status_code=503, detail="Docling service not available")
 
     contents = await file.read()
+    QUEUE_DEPTH.inc()
+
+    start_time = time.time()
 
     try:
         # Write temp file in thread pool (non-blocking for event loop)
@@ -103,12 +146,27 @@ async def extract_pdf(file: UploadFile = File(...)) -> models.ExtractResponse:
         # This allows the event loop to accept other requests while docling runs
         text, page_count = await asyncio.to_thread(converter_mod._convert_docling, tmp_path)
 
+        # Record metrics
+        duration = time.time() - start_time
+        REQUEST_COUNT.labels(status='success').inc()
+        REQUEST_DURATION.observe(duration)
+        PDF_PAGE_COUNT.observe(page_count)
+
         # Smart OCR: extract images with fitz and only run OCR if images were found
         ocr_text = ""
         if ocr_mod.ocr_reader:
             images = await asyncio.to_thread(ocr_mod._extract_images, tmp_path)
             if images:
-                ocr_text = await asyncio.to_thread(ocr_mod._ocr_images_sync, tmp_path)
+                try:
+                    ocr_text = await asyncio.to_thread(ocr_mod._ocr_images_sync, tmp_path)
+                    OCR_COUNT.labels(status='success').inc()
+                except Exception as e:
+                    print(f"OCR failed for {tmp_path}: {e}")
+                    OCR_COUNT.labels(status='failure').inc()
+            else:
+                OCR_COUNT.labels(status='skipped').inc()
+        else:
+            OCR_COUNT.labels(status='skipped').inc()
 
         # Clean up temp file in background (fire-and-forget)
         asyncio.create_task(asyncio.to_thread(Path(tmp_path).unlink, missing_ok=True))
@@ -121,18 +179,24 @@ async def extract_pdf(file: UploadFile = File(...)) -> models.ExtractResponse:
         )
 
     except Exception as e:
+        REQUEST_COUNT.labels(status='failure').inc()
         return models.ExtractResponse(
             success=False,
             text="",
             page_count=0,
             error=str(e),
         )
+    finally:
+        QUEUE_DEPTH.dec()
 
 
 @app.post("/extract-url", response_model=models.ExtractResponse)
 async def extract_from_url(request: models.UrlExtractRequest) -> models.ExtractResponse:
     if converter_mod.converter is None:
         raise HTTPException(status_code=503, detail="Docling service not available")
+
+    QUEUE_DEPTH.inc()
+    start_time = time.time()
 
     try:
         # URL fetch + docling in thread pool
@@ -155,6 +219,11 @@ async def extract_from_url(request: models.UrlExtractRequest) -> models.ExtractR
 
         text, page_count = await asyncio.to_thread(_fetch_and_convert)
 
+        duration = time.time() - start_time
+        REQUEST_COUNT.labels(status='success').inc()
+        REQUEST_DURATION.observe(duration)
+        PDF_PAGE_COUNT.observe(page_count)
+
         return models.ExtractResponse(
             success=True,
             text=text,
@@ -162,12 +231,15 @@ async def extract_from_url(request: models.UrlExtractRequest) -> models.ExtractR
         )
 
     except Exception as e:
+        REQUEST_COUNT.labels(status='failure').inc()
         return models.ExtractResponse(
             success=False,
             text="",
             page_count=0,
             error=str(e),
         )
+    finally:
+        QUEUE_DEPTH.dec()
 
 
 @app.get("/")
@@ -177,9 +249,10 @@ async def root():
         "version": "1.2.0",
         "device": config.get_device(),
         "workers": config.WORKERS,
-        "features": ["docling_text_extraction", "smart_easyocr_image_ocr", "async_thread_pool"],
+        "features": ["docling_text_extraction", "smart_easyocr_image_ocr", "async_thread_pool", "prometheus_metrics"],
         "endpoints": {
             "health": "GET /health",
+            "metrics": "GET /metrics",
             "extract": "POST /extract",
             "extract_url": "POST /extract-url",
         },

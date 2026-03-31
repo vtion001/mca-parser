@@ -40,7 +40,7 @@ abstract class BaseAIService
     }
 
     /**
-     * Returns the provider name (e.g., "minimax" or "openrouter")
+     * Returns the provider name (e.g., "openrouter")
      */
     abstract protected function getProviderName(): string;
 

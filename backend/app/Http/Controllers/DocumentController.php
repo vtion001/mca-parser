@@ -10,7 +10,9 @@ class DocumentController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $query = Document::query();
+        $accountId = $request->attributes->get('account_id');
+
+        $query = Document::query()->forAccount($accountId);
 
         // Filter by status if provided
         if ($request->has('status')) {
@@ -40,9 +42,11 @@ class DocumentController extends Controller
         ]);
     }
 
-    public function show(string $id): JsonResponse
+    public function show(Request $request, string $id): JsonResponse
     {
-        $query = Document::with('batches');
+        $accountId = $request->attributes->get('account_id');
+
+        $query = Document::query()->forAccount($accountId)->with('batches');
 
         // Check if id is numeric (integer ID) or string (UUID/filename)
         if (is_numeric($id)) {
@@ -61,9 +65,11 @@ class DocumentController extends Controller
         return response()->json(['data' => $document]);
     }
 
-    public function destroy(int $id): JsonResponse
+    public function destroy(Request $request, int $id): JsonResponse
     {
-        $document = Document::find($id);
+        $accountId = $request->attributes->get('account_id');
+
+        $document = Document::query()->forAccount($accountId)->find($id);
 
         if (!$document) {
             return response()->json(['error' => 'Document not found'], 404);
@@ -78,7 +84,9 @@ class DocumentController extends Controller
 
     public function updateStatus(Request $request, int $id): JsonResponse
     {
-        $document = Document::find($id);
+        $accountId = $request->attributes->get('account_id');
+
+        $document = Document::query()->forAccount($accountId)->find($id);
 
         if (!$document) {
             return response()->json(['error' => 'Document not found'], 404);

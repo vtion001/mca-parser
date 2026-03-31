@@ -13,6 +13,6 @@ return [
     'openrouter' => [
         'api_key' => env('OPENROUTER_API_KEY', ''),
         'api_url' => env('OPENROUTER_API_URL', 'https://openrouter.ai/api/v1'),
-        'model' => env('OPENROUTER_MODEL', 'openai/gpt-3.5-turbo'),
+        'model' => env('OPENROUTER_MODEL', 'google/gemini-3.1-pro-preview'),
     ],
 ];

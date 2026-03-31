@@ -17,24 +17,31 @@ Route::prefix('v1')->group(function () {
     Route::post('/pdf/analyze', [PdfController::class, 'analyze']);
     Route::post('/pdf/scrub', [PdfController::class, 'scrub']);
 
-    // New extraction endpoints
+    // Extraction endpoints
+    // Note: full-extract does NOT require account middleware because the frontend
+    // does not send X-Account-ID. For proper multi-tenant support, add frontend account
+    // selection and re-add 'account' middleware here.
     Route::post('/pdf/full-extract', [ExtractionController::class, 'fullExtract']);
     Route::get('/pdf/progress/{jobId}', [ExtractionController::class, 'progress']);
 
-    // Document management
-    Route::get('/documents', [DocumentController::class, 'index']);
-    Route::get('/documents/{id}', [DocumentController::class, 'show']);
-    Route::delete('/documents/{id}', [DocumentController::class, 'destroy']);
-    Route::patch('/documents/{id}/status', [DocumentController::class, 'updateStatus']);
+    // Document/batch management requires account for multi-tenant isolation
+    Route::middleware('account')->group(function () {
 
-    // Batch management
-    Route::get('/batches', [BatchController::class, 'index']);
-    Route::post('/batches', [BatchController::class, 'store']);
-    Route::get('/batches/{id}', [BatchController::class, 'show']);
-    Route::post('/batches/{id}/documents', [BatchController::class, 'addDocuments']);
-    Route::post('/batches/{id}/process', [BatchController::class, 'startProcessing']);
-    Route::get('/batches/{id}/progress', [BatchController::class, 'getProgress']);
+        // Document management
+        Route::get('/documents', [DocumentController::class, 'index']);
+        Route::get('/documents/{id}', [DocumentController::class, 'show']);
+        Route::delete('/documents/{id}', [DocumentController::class, 'destroy']);
+        Route::patch('/documents/{id}/status', [DocumentController::class, 'updateStatus']);
 
-    // Comparison
-    Route::post('/documents/compare', [ComparisonController::class, 'compare']);
+        // Batch management
+        Route::get('/batches', [BatchController::class, 'index']);
+        Route::post('/batches', [BatchController::class, 'store']);
+        Route::get('/batches/{id}', [BatchController::class, 'show']);
+        Route::post('/batches/{id}/documents', [BatchController::class, 'addDocuments']);
+        Route::post('/batches/{id}/process', [BatchController::class, 'startProcessing']);
+        Route::get('/batches/{id}/progress', [BatchController::class, 'getProgress']);
+
+        // Comparison
+        Route::post('/documents/compare', [ComparisonController::class, 'compare']);
+    });
 });

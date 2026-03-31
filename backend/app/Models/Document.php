@@ -3,11 +3,13 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Document extends Model
 {
     protected $fillable = [
+        'account_id',
         'filename',
         'original_filename',
         'file_path',
@@ -39,11 +41,21 @@ class Document extends Model
     public const STATUS_COMPLETE = 'complete';
     public const STATUS_FAILED = 'failed';
 
+    public function account(): BelongsTo
+    {
+        return $this->belongsTo(Account::class);
+    }
+
     public function batches(): BelongsToMany
     {
         return $this->belongsToMany(Batch::class, 'document_batches')
             ->withPivot('processing_order')
             ->withTimestamps();
+    }
+
+    public function scopeForAccount($query, int $accountId)
+    {
+        return $query->where('account_id', $accountId);
     }
 
     public function isProcessable(): bool

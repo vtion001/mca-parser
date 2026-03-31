@@ -23,6 +23,11 @@ class ExtractionController extends BaseController
             'file' => 'required|file|mimes:pdf|max:51200',
         ]);
 
+        // Account context may not be present (frontend doesn't send X-Account-ID in single-tenant mode).
+        // Default to account 1 for backward compatibility. Proper multi-tenant support requires
+        // frontend account selection and this field should become required.
+        $accountId = $request->attributes->get('account_id') ?? 1;
+
         $file = $request->file('file');
         $originalFilename = $file->getClientOriginalName();
 
@@ -32,6 +37,7 @@ class ExtractionController extends BaseController
 
         // Create Document record before dispatching so results can be persisted
         $document = Document::create([
+            'account_id' => $accountId,
             'filename' => $filename,
             'original_filename' => $originalFilename,
             'file_path' => Storage::disk('local')->path($filePath),

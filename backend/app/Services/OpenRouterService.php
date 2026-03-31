@@ -22,7 +22,7 @@ class OpenRouterService extends BaseAIService
         ?LoggerInterface $logger = null
     ) {
         parent::__construct($apiKey, $apiUrl, $timeout, $logger);
-        $this->model = $model ?? config('services.openrouter.model', 'openai/gpt-3.5-turbo');
+        $this->model = $model ?? config('services.openrouter.model', 'google/gemini-3.1-pro-preview');
     }
 
     protected function getProviderName(): string

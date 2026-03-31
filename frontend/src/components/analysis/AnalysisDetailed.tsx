@@ -5,24 +5,35 @@ interface AnalysisDetailedProps {
 }
 
 export function AnalysisDetailed({ result }: AnalysisDetailedProps) {
-  if (!result.ai_analysis || !result.ai_analysis.success || !result.ai_analysis.analysis) {
+  // Render even when success is false — BaseAIService fallback still provides useful analysis data
+  if (!result.ai_analysis || !result.ai_analysis.analysis) {
     return null;
   }
 
-  const analysis = result.ai_analysis.analysis;
+  const { success, analysis } = result.ai_analysis;
+  const isFallback = !success;
 
   return (
     <div className="bg-white rounded-xl border border-bw-100 shadow-card overflow-hidden">
       <div className="px-6 py-4 border-b border-bw-100 flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-bw-700">AI Document Analysis</h3>
+        <div className="flex items-center gap-2">
+          <h3 className="text-sm font-semibold text-bw-700">AI Document Analysis</h3>
+          {isFallback && (
+            <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700 border border-yellow-200">
+              Basic
+            </span>
+          )}
+        </div>
         <div className="flex items-center gap-2">
           <span
             className={`px-2 py-1 rounded-full text-xs font-medium ${
-              analysis.qualification_score >= 7
-                ? 'bg-green-100 text-green-700'
-                : analysis.qualification_score >= 4
-                  ? 'bg-yellow-100 text-yellow-700'
-                  : 'bg-red-100 text-red-700'
+              isFallback
+                ? 'bg-yellow-100 text-yellow-700'
+                : analysis.qualification_score >= 7
+                  ? 'bg-green-100 text-green-700'
+                  : analysis.qualification_score >= 4
+                    ? 'bg-yellow-100 text-yellow-700'
+                    : 'bg-red-100 text-red-700'
             }`}
           >
             Score: {analysis.qualification_score}/10

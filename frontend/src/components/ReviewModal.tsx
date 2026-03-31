@@ -14,6 +14,7 @@ import {
 } from './review';
 
 import type { FilterTab, FilterCounts, BalanceSummary } from './review';
+import { InsightsScorecard } from './InsightsScorecard';
 
 // ─── Styles ────────────────────────────────────────────────────────────────────
 
@@ -23,6 +24,10 @@ const CSS = `
   .row-flash { animation: flash-in 0.4s ease-out; }
   @keyframes flash-in { 0% { background-color: #fef9c3; } 100% { background-color: transparent; } }
 `;
+
+// ─── View type ─────────────────────────────────────────────────────────────────
+
+type ReviewView = 'transactions' | 'scorecard';
 
 // ─── Props ─────────────────────────────────────────────────────────────────────
 
@@ -44,6 +49,7 @@ export function ReviewModal({ result, onClose }: ReviewModalProps) {
   const [statement, setStatement] = useState<ParsedStatement | null>(null);
   const [selectedAccountIdx, setSelectedAccountIdx] = useState(0);
   const [editMode, setEditMode] = useState(false);
+  const [reviewView, setReviewView] = useState<ReviewView>('transactions');
 
   // Parse transactions from markdown on mount
   useEffect(() => {
@@ -216,52 +222,85 @@ export function ReviewModal({ result, onClose }: ReviewModalProps) {
           onReset={handleReset}
         />
 
-        {/* COLUMN HEADER */}
-        <div className="grid grid-cols-[2rem_3.5rem_1fr_6.5rem_6.5rem_auto_2.5rem] gap-0 px-4 py-1.5 border-b border-bw-200 bg-bw-50 flex-shrink-0">
-          <div className="text-[9px] font-semibold text-bw-400 uppercase tracking-widest self-center">#</div>
-          <div className="text-[9px] font-semibold text-bw-400 uppercase tracking-widest self-center">Date</div>
-          <div className="text-[9px] font-semibold text-bw-400 uppercase tracking-widest self-center">Payee</div>
-          <div className="text-[9px] font-semibold text-bw-400 uppercase tracking-widest text-right self-center">Debit</div>
-          <div className="text-[9px] font-semibold text-bw-400 uppercase tracking-widest text-right self-center">Credit</div>
-          <div className="text-[9px] font-semibold text-bw-400 uppercase tracking-widest self-center">Tags</div>
-          <div className="text-[9px] font-semibold text-bw-400 uppercase tracking-widest text-center self-center">✓</div>
+        {/* View Mode Toggle */}
+        <div className="flex items-center gap-1 px-4 py-1.5 border-b border-bw-200 bg-bw-50 flex-shrink-0">
+          <button
+            onClick={() => setReviewView('transactions')}
+            className={`px-3 py-1 text-[10px] font-medium rounded-md transition-colors ${
+              reviewView === 'transactions'
+                ? 'bg-bw-900 text-white'
+                : 'text-bw-500 hover:text-bw-900 hover:bg-bw-100'
+            }`}
+          >
+            Transactions
+          </button>
+          <button
+            onClick={() => setReviewView('scorecard')}
+            className={`px-3 py-1 text-[10px] font-medium rounded-md transition-colors ${
+              reviewView === 'scorecard'
+                ? 'bg-blue-600 text-white'
+                : 'text-bw-500 hover:text-bw-900 hover:bg-bw-100'
+            }`}
+          >
+            Insights Scorecard
+          </button>
         </div>
 
-        {/* SCROLLABLE TRANSACTION LIST */}
-        <div className="flex-1 overflow-y-auto">
-          {paged.length === 0 ? (
-            <ReviewEmptyState hasFilter={hasActiveFilter} />
-          ) : (
-            <div>
-              {paged.map((txn, idx) => {
-                const globalIdx = (page - 1) * pageSize + idx;
-                return (
-                  <ReviewTransactionRow
-                    key={txn.id}
-                    txn={txn}
-                    globalIdx={globalIdx}
-                    editMode={editMode}
-                    onTagEdit={setEditingTxn}
-                    onToggleTrue={toggleTrue}
-                  />
-                );
-              })}
+        {/* Conditional Content */}
+        {reviewView === 'scorecard' ? (
+          <div className="flex-1 overflow-y-auto p-4">
+            <InsightsScorecard result={result} />
+          </div>
+        ) : (
+          <>
+            {/* COLUMN HEADER */}
+            <div className="grid grid-cols-[2rem_3.5rem_1fr_6.5rem_6.5rem_auto_2.5rem] gap-0 px-4 py-1.5 border-b border-bw-200 bg-bw-50 flex-shrink-0">
+              <div className="text-[9px] font-semibold text-bw-400 uppercase tracking-widest self-center">#</div>
+              <div className="text-[9px] font-semibold text-bw-400 uppercase tracking-widest self-center">Date</div>
+              <div className="text-[9px] font-semibold text-bw-400 uppercase tracking-widest self-center">Payee</div>
+              <div className="text-[9px] font-semibold text-bw-400 uppercase tracking-widest text-right self-center">Debit</div>
+              <div className="text-[9px] font-semibold text-bw-400 uppercase tracking-widest text-right self-center">Credit</div>
+              <div className="text-[9px] font-semibold text-bw-400 uppercase tracking-widest self-center">Tags</div>
+              <div className="text-[9px] font-semibold text-bw-400 uppercase tracking-widest text-center self-center">✓</div>
             </div>
-          )}
-        </div>
 
-        {/* FOOTER */}
-        <ReviewFooter
-          filtered={filterCounts}
-          page={page}
-          totalPages={totalPages}
-          pageSize={pageSize}
-          onPageChange={setPage}
-          onPageSizeChange={setPageSize}
-          balanceSummary={balanceSummary}
-          result={result}
-          confidence={confidence}
-        />
+            {/* SCROLLABLE TRANSACTION LIST */}
+            <div className="flex-1 overflow-y-auto">
+              {paged.length === 0 ? (
+                <ReviewEmptyState hasFilter={hasActiveFilter} />
+              ) : (
+                <div>
+                  {paged.map((txn, idx) => {
+                    const globalIdx = (page - 1) * pageSize + idx;
+                    return (
+                      <ReviewTransactionRow
+                        key={txn.id}
+                        txn={txn}
+                        globalIdx={globalIdx}
+                        editMode={editMode}
+                        onTagEdit={setEditingTxn}
+                        onToggleTrue={toggleTrue}
+                      />
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* FOOTER */}
+            <ReviewFooter
+              filtered={filterCounts}
+              page={page}
+              totalPages={totalPages}
+              pageSize={pageSize}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+              balanceSummary={balanceSummary}
+              result={result}
+              confidence={confidence}
+            />
+          </>
+        )}
       </div>
 
       {/* TAG EDITOR MODAL */}

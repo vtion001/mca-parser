@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Account;
 use App\Models\Batch;
 use App\Models\Document;
 use App\Jobs\ProcessPdfExtraction;
@@ -13,7 +14,9 @@ class BatchController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $query = Batch::query()->with('documents');
+        $accountId = $request->attributes->get('account_id');
+
+        $query = Batch::query()->forAccount($accountId)->with('documents');
 
         // Filter by status if provided
         if ($request->has('status')) {
@@ -40,6 +43,8 @@ class BatchController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        $accountId = $request->attributes->get('account_id');
+
         $request->validate([
             'name' => 'nullable|string|max:255',
             'document_ids' => 'required|array',
@@ -49,8 +54,20 @@ class BatchController extends Controller
         $documentIds = $request->input('document_ids');
         $batchName = $request->input('name', 'Batch ' . now()->format('Y-m-d H:i'));
 
+        // Verify all documents belong to the same account
+        $documents = Document::query()->forAccount($accountId)
+            ->whereIn('id', $documentIds)
+            ->get();
+
+        if ($documents->count() !== count($documentIds)) {
+            return response()->json([
+                'error' => 'Some documents do not belong to your account',
+            ], 403);
+        }
+
         // Create batch
         $batch = Batch::create([
+            'account_id' => $accountId,
             'name' => $batchName,
             'status' => Batch::STATUS_PENDING,
             'total_documents' => count($documentIds),
@@ -67,11 +84,16 @@ class BatchController extends Controller
         return response()->json(['data' => $batch], 201);
     }
 
-    public function show(int $id): JsonResponse
+    public function show(Request $request, int $id): JsonResponse
     {
-        $batch = Batch::with(['documents' => function ($query) {
-            $query->orderBy('document_batches.processing_order');
-        }])->find($id);
+        $accountId = $request->attributes->get('account_id');
+
+        $batch = Batch::query()
+            ->forAccount($accountId)
+            ->with(['documents' => function ($query) {
+                $query->orderBy('document_batches.processing_order');
+            }])
+            ->find($id);
 
         if (!$batch) {
             return response()->json(['error' => 'Batch not found'], 404);
@@ -82,7 +104,9 @@ class BatchController extends Controller
 
     public function addDocuments(Request $request, int $id): JsonResponse
     {
-        $batch = Batch::find($id);
+        $accountId = $request->attributes->get('account_id');
+
+        $batch = Batch::query()->forAccount($accountId)->find($id);
 
         if (!$batch) {
             return response()->json(['error' => 'Batch not found'], 404);
@@ -98,6 +122,18 @@ class BatchController extends Controller
         ]);
 
         $documentIds = $request->input('document_ids');
+
+        // Verify all documents belong to the same account
+        $documents = Document::query()->forAccount($accountId)
+            ->whereIn('id', $documentIds)
+            ->get();
+
+        if ($documents->count() !== count($documentIds)) {
+            return response()->json([
+                'error' => 'Some documents do not belong to your account',
+            ], 403);
+        }
+
         $currentCount = $batch->documents()->count();
 
         foreach ($documentIds as $order => $documentId) {
@@ -113,7 +149,12 @@ class BatchController extends Controller
 
     public function startProcessing(int $id): JsonResponse
     {
-        $batch = Batch::with('documents')->find($id);
+        $accountId = request()->attributes->get('account_id');
+
+        $batch = Batch::query()
+            ->forAccount($accountId)
+            ->with('documents')
+            ->find($id);
 
         if (!$batch) {
             return response()->json(['error' => 'Batch not found'], 404);
@@ -144,9 +185,14 @@ class BatchController extends Controller
 
     public function getProgress(int $id): JsonResponse
     {
-        $batch = Batch::with(['documents' => function ($query) {
-            $query->select('documents.id', 'filename', 'status');
-        }])->find($id);
+        $accountId = request()->attributes->get('account_id');
+
+        $batch = Batch::query()
+            ->forAccount($accountId)
+            ->with(['documents' => function ($query) {
+                $query->select('documents.id', 'filename', 'status');
+            }])
+            ->find($id);
 
         if (!$batch) {
             return response()->json(['error' => 'Batch not found'], 404);

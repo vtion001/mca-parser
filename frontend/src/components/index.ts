@@ -13,6 +13,7 @@ export { ComparativeView } from './ComparativeView';
 export { DocumentDetailPanel } from './DocumentDetailPanel';
 export { ReviewModal } from './ReviewModal';
 export { ErrorBoundary } from './ErrorBoundary';
+export { InsightsScorecard } from './InsightsScorecard';
 
 // Statements module
 export * from './statements';
