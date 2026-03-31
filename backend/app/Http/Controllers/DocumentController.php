@@ -40,9 +40,19 @@ class DocumentController extends Controller
         ]);
     }
 
-    public function show(int $id): JsonResponse
+    public function show(string $id): JsonResponse
     {
-        $document = Document::with('batches')->find($id);
+        $query = Document::with('batches');
+
+        // Check if id is numeric (integer ID) or string (UUID/filename)
+        if (is_numeric($id)) {
+            $document = $query->find((int) $id);
+        } else {
+            // Try to find by filename with exact match, or with .pdf extension
+            $document = $query->where('filename', $id)
+                ->orWhere('filename', $id . '.pdf')
+                ->first();
+        }
 
         if (!$document) {
             return response()->json(['error' => 'Document not found'], 404);
