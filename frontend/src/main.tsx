@@ -92,7 +92,7 @@ function App() {
 
         <footer className="max-w-6xl mx-auto px-8 py-8 border-t border-bw-100">
           <p className="text-xs text-bw-400 text-center">
-            MCA PDF Scrubber. Process your documents securely.
+            Doc Scrappy · Powered by Alliance Global Solutions
           </p>
         </footer>
       </div>

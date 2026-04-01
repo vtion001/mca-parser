@@ -34,7 +34,7 @@ export function SettingsPanel() {
       <div className="mt-8 pt-6 border-t border-bw-100">
         <h4 className="text-xs font-medium text-bw-500 uppercase tracking-wider mb-3">About</h4>
         <p className="text-sm text-bw-400 leading-relaxed">
-          MCA PDF Scrubber uses advanced document analysis to detect and remove personally identifiable information from your PDFs.
+          Doc Scrappy uses advanced document analysis to detect and remove personally identifiable information from your PDFs.
         </p>
       </div>
     </div>
