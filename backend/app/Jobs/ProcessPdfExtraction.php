@@ -18,6 +18,7 @@ use App\Services\PdfAnalyzerService;
 use App\Services\BalanceExtractorService;
 use App\Services\OpenRouterService;
 use App\Services\PiiPatterns;
+use App\Services\McaAiService;
 
 class ProcessPdfExtraction implements ShouldQueue
 {
@@ -46,7 +47,8 @@ class ProcessPdfExtraction implements ShouldQueue
         ExtractionScorer $scorer,
         PdfAnalyzerService $analyzer,
         BalanceExtractorService $balanceExtractor,
-        OpenRouterService $openRouterService
+        OpenRouterService $openRouterService,
+        McaAiService $mcaAiService
     ): void {
         try {
             $this->updateProgress('extracting', 'Extracting text from PDF...', 10);
@@ -111,8 +113,9 @@ class ProcessPdfExtraction implements ShouldQueue
 
             $this->updateProgress('analyzing_quality', 'Analyzing extraction quality...', 75);
 
-            $piiPatterns = $this->getPiiPatterns();
-            $piiDetected = $this->detectPiiPatterns($fullMarkdown, $piiPatterns);
+            $hasPii = $analyzer->checkPiiIndicators($fullMarkdown);
+            $piiPatterns = PiiPatterns::ALL;
+            $piiDetected = $hasPii ? array_keys($piiPatterns) : [];
 
             $scoreResult = $scorer->score($fullMarkdown, $pageCount, $piiDetected, $piiPatterns);
 
@@ -121,13 +124,17 @@ class ProcessPdfExtraction implements ShouldQueue
             $balances = $balanceExtractor->extractBalances($fullMarkdown);
 
             // AI Analysis via OpenRouter
-            $this->updateProgress('ai_analysis', 'Running AI analysis...', 90);
+            $this->updateProgress('ai_analysis', 'Running AI analysis...', 85);
             $aiAnalysis = $openRouterService->analyzeDocument(
                 $fullMarkdown,
                 $docType,
                 $keyDetails,
                 $balances
             );
+
+            // MCA Detection (hybrid pre-filter + AI)
+            $this->updateProgress('mca_detection', 'Detecting MCA transactions...', 92);
+            $mcaFindings = $mcaAiService->detect($fullMarkdown, $keyDetails, $balances);
 
             $this->updateProgress('complete', 'Done', 100);
 
@@ -141,6 +148,7 @@ class ProcessPdfExtraction implements ShouldQueue
                 'recommendations' => $scoreResult['recommendations'],
                 'balances' => $balances,
                 'ai_analysis' => $aiAnalysis,
+                'mca_findings' => $mcaFindings,
                 'page_count' => $pageCount,
             ];
 
@@ -163,6 +171,7 @@ class ProcessPdfExtraction implements ShouldQueue
                         'recommendations' => $scoreResult['recommendations'],
                         'balances' => $balances,
                         'ai_analysis' => $aiAnalysis,
+                        'mca_findings' => $mcaFindings,
                         'page_count' => $pageCount,
                     ]);
                 }
@@ -247,35 +256,6 @@ class ProcessPdfExtraction implements ShouldQueue
     }
 
     /**
-     * Get PII detection patterns with labels
-     */
-    private function getPiiPatterns(): array
-    {
-        return [
-            'ssn' => PiiPatterns::SSN,
-            'email' => PiiPatterns::EMAIL,
-            'phone' => PiiPatterns::PHONE,
-        ];
-    }
-
-    /**
-     * Detect which PII patterns match in the text
-     * Returns array of pattern names that were found (e.g., ['ssn', 'email'])
-     */
-    private function detectPiiPatterns(string $text, array $patterns): array
-    {
-        $detected = [];
-
-        foreach ($patterns as $name => $pattern) {
-            if (preg_match($pattern, $text)) {
-                $detected[] = $name;
-            }
-        }
-
-        return $detected;
-    }
-
-    /**
      * Calculate content hash from file path for cache key
      */
     private function getContentHash(): string
@@ -312,6 +292,7 @@ class ProcessPdfExtraction implements ShouldQueue
                     'recommendations' => $result['recommendations'] ?? null,
                     'balances' => $result['balances'] ?? null,
                     'ai_analysis' => $result['ai_analysis'] ?? null,
+                    'mca_findings' => $result['mca_findings'] ?? null,
                     'page_count' => $result['page_count'] ?? null,
                 ]);
             }
