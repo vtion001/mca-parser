@@ -1,20 +1,24 @@
 import type { ExtractionResult } from '../types/extraction';
 import { AnalysisOverview } from './analysis/AnalysisOverview';
 import { AnalysisDetailed } from './analysis/AnalysisDetailed';
+import { McaFindings } from './analysis/McaFindings';
 
 interface AnalysisResultsProps {
   result: ExtractionResult;
 }
 
 /**
- * AnalysisResults - Combined view for balance summary and AI document analysis.
- * Renders Overview (balance summary) and Detailed (AI analysis) sections.
+ * AnalysisResults - Combined view for balance summary, MCA detection, and AI document analysis.
+ * Renders Overview (balance summary), MCA Findings, and Detailed (AI analysis) sections.
  */
 export function AnalysisResults({ result }: AnalysisResultsProps) {
   return (
     <div className="space-y-6">
       {/* Balance Summary */}
       <AnalysisOverview result={result} />
+
+      {/* MCA Transaction Detection */}
+      <McaFindings result={result} />
 
       {/* AI Document Analysis */}
       <AnalysisDetailed result={result} />

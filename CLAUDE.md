@@ -37,6 +37,9 @@ Browser → nginx:8000 → React (frontend) or Laravel (API)
 # Full stack with Docker
 docker-compose up --build
 
+# Full stack with monitoring (Prometheus + Grafana)
+docker-compose -f docker-compose.yml -f docker-compose.monitoring.yml up --build
+
 # Individual services
 cd frontend && npm run dev      # React on :5173
 cd backend && php artisan serve # Laravel on :8000
@@ -47,19 +50,30 @@ cd python-service && python src/server.py  # Docling on :8001
 ```bash
 cd backend
 composer install
-cp .env.example .env
+cp .env.example .env 2>/dev/null || true
 php artisan key:generate
-php artisan serve           # Start server
-php artisan test            # Run PHPUnit tests
+php artisan serve           # Start server on :8000
+php artisan test            # Run all PHPUnit tests
+php artisan test --filter=ClassName  # Run specific test class
 php artisan queue:work      # Process background jobs
 ```
 
-### Python Service
+### Frontend (React)
+```bash
+cd frontend
+npm install
+npm run dev     # Vite dev server on :5173
+npm run build   # Production build
+```
+
+### Python Service (Docling)
 ```bash
 cd python-service
 pip install -r requirements.txt
-python src/server.py
+python src/server.py  # Runs on :8001
 ```
+
+Requirements: Python 3.10+, PyTorch 2.0+, Docling 2.0+
 
 ## Key Services
 
@@ -77,11 +91,18 @@ python src/server.py
 - **OpenRouterService.php** - OpenRouter AI service (Google Gemini 3.1 Pro)
 - **BalanceExtractorService.php** - Extracts balance figures from documents
 - **DocumentTypeDetector.php** - Classifies document types
+- **FieldMapper.php** - Maps extracted fields based on document type
+- **ExtractionScorer.php** - Scores extraction quality and PII detection
+- **AccountMiddleware.php** - Multi-tenancy via `X-Account-ID` header; validates account isolation for documents/batches
+
+### Backend Jobs
+- **ProcessPdfExtraction.php** - Async job orchestrating full extraction pipeline: Docling → type detection → field mapping → PII detection → balance extraction → AI analysis. Uses Redis caching with stampede protection.
 
 ### Python Service (python-service/src/)
 - **server.py** - FastAPI server with async thread-pool offloading
 - **converter.py** - Docling PDF-to-markdown conversion
 - **ocr.py** - EasyOCR for image-based PDF content
+- **models.py** - Pydantic request/response models
 - **config.py** - Device detection (CUDA/CPU) and worker configuration
 
 ## API Endpoints
@@ -110,14 +131,32 @@ All routes prefixed with `/api/v1`:
 
 ## Frontend Structure
 
-- **ExtractionContext** - Centralized state for extraction workflow
-- **useExtractionState, useExtraction, useExtractionPolling** - Custom hooks
+- **ExtractionContext** - Centralized state for extraction workflow with polling support
+- **useExtractionState, useExtraction, useExtractionPolling** - Custom hooks for extraction workflow
 - **UploadSection** - PDF upload UI
 - **StatementsView** - Transaction statements display
 - **ReviewModal** - Manual transaction review/editing
-- **ComparativeView** - Multi-document comparison
+- **ComparativeView** - Multi-document comparison (balances, risk, transactions)
 - **DocumentLibrary** - Document management UI
+- **InsightsScorecard** - PDF analytics dashboard (revenue stats, balance charts, MCA/NSF/transfer filtering)
 - **analysis/** - Analysis results components
+
+## Multi-Tenancy
+
+Account isolation via `X-Account-ID` header on all account-scoped endpoints:
+- Documents and batches belong to an account
+- `AccountMiddleware` validates `X-Account-ID` header
+- Currently supports header-based isolation only (no user auth)
+- **Note:** `full-extract` endpoint does NOT enforce account middleware (single-tenant mode)
+
+## Scaling Architecture
+
+| Component | Replicas | Workers | Purpose |
+|-----------|----------|---------|---------|
+| Laravel Workers | --scale | 10/pod | Queue job processing |
+| Docling Service | 3 | - | PDF text extraction via load balancer |
+| Redis | 1 | - | Cache + Queue |
+| MySQL | 1 | - | Persistent storage |
 
 ## Docker Environment Variables
 
@@ -169,3 +208,5 @@ Before deploying, verify:
 1. **AccountMiddleware** requires a User/authentication system to be implemented for full multi-tenant security. Currently supports account isolation via `X-Account-ID` header validation only.
 
 2. **Scaling workers**: Use `docker-compose up -d --scale laravel-worker=10` for standalone Docker Compose. For Swarm, use `docker stack deploy`.
+
+3. **`full-extract` endpoint** does NOT enforce account middleware - single-tenant mode only. Frontend does not send `X-Account-ID` header.

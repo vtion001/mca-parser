@@ -45,6 +45,7 @@ export interface ExtractionResult {
     analysis: AiAnalysis | null;
     error?: string;
   };
+  mca_findings?: McaFindings;
   page_count: number;
 }
 
@@ -89,6 +90,31 @@ export interface KeyDetail {
 export interface Recommendation {
   type: 'quality' | 'completeness' | 'pii' | 'structure';
   message: string;
+}
+
+export interface McaTransaction {
+  description: string;
+  amount: number | null;
+  date: string | null;
+  is_mca: boolean;
+  mca_provider: string | null;
+  confidence: number;
+  source: 'provider_match' | 'keyword_match' | 'ai_review' | 'prefilter_fallback';
+  match_type?: string;
+  reasoning?: string;
+}
+
+export interface McaFindings {
+  transactions: McaTransaction[];
+  candidates_reviewed?: McaTransaction[];
+  summary: {
+    total_mca_transactions: number;
+    total_mca_amount: number;
+    unique_providers: string[];
+    average_confidence: number;
+    ai_reviewed_candidates?: number;
+    ai_confirmed_mca?: number;
+  };
 }
 
 export interface ProgressResponse {
