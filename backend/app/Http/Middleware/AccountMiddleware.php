@@ -12,32 +12,34 @@ class AccountMiddleware
 {
     public function handle(Request $request, Closure $next): Response
     {
-        $accountId = $request->header('X-Account-ID') ?? $request->query('account_id');
-
-        // Validate account ID format (must be positive integer)
-        if (!$accountId || !is_numeric($accountId) || (int) $accountId <= 0) {
-            Log::warning('Account access attempted with invalid account ID', [
-                'account_id' => $accountId,
-                'ip' => $request->ip(),
-                'user_agent' => $request->userAgent(),
-            ]);
-
+        // User must be authenticated (AuthMiddleware sets $request->user)
+        $user = $request->user();
+        if (!$user) {
             return response()->json([
                 'success' => false,
-                'error' => 'Invalid account access.',
+                'error' => 'Unauthenticated.',
             ], 401);
         }
 
-        $accountId = (int) $accountId;
+        // Account ID from header or inferred from authenticated user
+        $headerAccountId = $request->header('X-Account-ID') ?? $request->query('account_id');
 
-        $account = Account::where('id', $accountId)
-            ->where('is_active', true)
-            ->first();
+        // If no header provided, use the user's own account
+        if (!$headerAccountId || !is_numeric($headerAccountId) || (int) $headerAccountId <= 0) {
+            // Infer account from authenticated user
+            $request->attributes->set('account_id', $user->account_id);
+            $request->attributes->set('account', $user->account);
+            return $next($request);
+        }
 
-        if (!$account) {
-            // Use generic message to prevent account enumeration
-            Log::info('Account access failed for account ID', [
-                'account_id' => $accountId,
+        $accountId = (int) $headerAccountId;
+
+        // User must belong to the requested account
+        if ($user->account_id !== $accountId) {
+            Log::warning('User attempted to access account they do not own', [
+                'user_id' => $user->id,
+                'user_account_id' => $user->account_id,
+                'requested_account_id' => $accountId,
                 'ip' => $request->ip(),
             ]);
 
@@ -47,11 +49,22 @@ class AccountMiddleware
             ], 403);
         }
 
-        // Store account context for downstream use
+        $account = Account::where('id', $accountId)
+            ->where('is_active', true)
+            ->first();
+
+        if (!$account) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Invalid account access.',
+            ], 403);
+        }
+
         $request->attributes->set('account_id', $account->id);
         $request->attributes->set('account', $account);
 
         Log::debug('Account access granted', [
+            'user_id' => $user->id,
             'account_id' => $account->id,
         ]);
 

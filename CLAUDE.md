@@ -40,6 +40,14 @@ docker-compose up --build
 # Full stack with monitoring (Prometheus + Grafana)
 docker-compose -f docker-compose.yml -f docker-compose.monitoring.yml up --build
 
+# Rebuild after frontend changes (rebuilds both frontend and nginx containers)
+docker-compose build frontend nginx
+docker-compose up -d
+
+# Rebuild only frontend (for React/CSS changes)
+docker-compose build frontend
+docker-compose up -d
+
 # Individual services
 cd frontend && npm run dev      # React on :5173
 cd backend && php artisan serve # Laravel on :8000
@@ -83,6 +91,7 @@ Requirements: Python 3.10+, PyTorch 2.0+, Docling 2.0+
 - **BatchController.php** - Batch document processing
 - **ComparisonController.php** - Document comparison (balances, risk, transactions)
 - **ExtractionController.php** - Async extraction with job progress tracking
+- **AuthController.php** - User registration, login, logout, and me endpoints
 
 ### Backend Services
 - **DoclingService.php** - HTTP client to Python Docling service (600s timeout for large PDFs)
@@ -93,7 +102,8 @@ Requirements: Python 3.10+, PyTorch 2.0+, Docling 2.0+
 - **DocumentTypeDetector.php** - Classifies document types
 - **FieldMapper.php** - Maps extracted fields based on document type
 - **ExtractionScorer.php** - Scores extraction quality and PII detection
-- **AccountMiddleware.php** - Multi-tenancy via `X-Account-ID` header; validates account isolation for documents/batches
+- **AccountMiddleware.php** - Multi-tenancy via `X-Account-ID` header; validates user-account ownership after auth
+- **AuthMiddleware.php** - Bearer token authentication; validates `api_token` on every request
 
 ### Backend Jobs
 - **ProcessPdfExtraction.php** - Async job orchestrating full extraction pipeline: Docling → type detection → field mapping → PII detection → balance extraction → AI analysis. Uses Redis caching with stampede protection.
@@ -114,6 +124,10 @@ All routes prefixed with `/api/v1`:
 | GET | `/health` | Basic health check |
 | GET | `/health/ready` | Readiness check |
 | GET | `/health/docling` | Docling service health |
+| POST | `/auth/register` | Register new user (public) |
+| POST | `/auth/login` | Login, returns Bearer token (public) |
+| POST | `/auth/logout` | Revoke Bearer token (auth required) |
+| GET | `/auth/me` | Get current user (auth required) |
 | POST | `/pdf/upload` | Upload PDF and extract text |
 | POST | `/pdf/analyze` | Analyze PDF text (word count, PII, confidence) |
 | POST | `/pdf/scrub` | Remove PII from PDF text |
@@ -143,18 +157,19 @@ All routes prefixed with `/api/v1`:
 
 ## Multi-Tenancy
 
-Account isolation via `X-Account-ID` header on all account-scoped endpoints:
-- Documents and batches belong to an account
-- `AccountMiddleware` validates `X-Account-ID` header
-- Currently supports header-based isolation only (no user auth)
-- **Note:** `full-extract` endpoint does NOT enforce account middleware (single-tenant mode)
+User authentication via Bearer token (`api_token`) + account ownership validation:
+- All API endpoints (except health/auth) require `Authorization: Bearer <token>`
+- `AuthMiddleware` validates the token against the `users` table
+- `AccountMiddleware` runs after auth and enforces `X-Account-ID` header matches the authenticated user's `account_id`
+- Documents and batches belong to an account and are isolated per user
+- Users belong to exactly one account via `account_id` foreign key
 
 ## Scaling Architecture
 
 | Component | Replicas | Workers | Purpose |
 |-----------|----------|---------|---------|
 | Laravel Workers | --scale | 10/pod | Queue job processing |
-| Docling Service | 3 | - | PDF text extraction via load balancer |
+| Docling Service | 5 | - | PDF text extraction via load balancer |
 | Redis | 1 | - | Cache + Queue |
 | MySQL | 1 | - | Persistent storage |
 
@@ -200,13 +215,11 @@ Before deploying, verify:
 - [x] Cache has stampede protection and graceful fallback
 - [x] Prometheus metrics properly observed on all endpoints
 - [x] `deploy.replicas` removed, use `--scale` flag for standalone Docker Compose
-- [ ] AccountMiddleware has user authentication (requires User model + auth system)
-- [ ] AccountMiddleware has user-account ownership validation (requires User model)
+- [x] AccountMiddleware has user authentication (requires User model + auth system)
+- [x] AccountMiddleware has user-account ownership validation (requires User model)
 
 ## Known Limitations
 
-1. **AccountMiddleware** requires a User/authentication system to be implemented for full multi-tenant security. Currently supports account isolation via `X-Account-ID` header validation only.
+1. **Scaling workers**: Use `docker-compose up -d --scale laravel-worker=10` for standalone Docker Compose. For Swarm, use `docker stack deploy`.
 
-2. **Scaling workers**: Use `docker-compose up -d --scale laravel-worker=10` for standalone Docker Compose. For Swarm, use `docker stack deploy`.
-
-3. **`full-extract` endpoint** does NOT enforce account middleware - single-tenant mode only. Frontend does not send `X-Account-ID` header.
+2. **Docling replicas**: 5 named containers (docling-1 through docling-5) replace the `--scale` approach due to shared volume requirements.

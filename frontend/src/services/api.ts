@@ -9,6 +9,31 @@ const api = axios.create({
   },
 });
 
+// Attach Bearer token and X-Account-ID from localStorage on every request
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('api_token');
+  const accountId = localStorage.getItem('account_id');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  if (accountId) {
+    config.headers['X-Account-ID'] = accountId;
+  }
+  return config;
+});
+
+// Persist token + account_id on successful login
+api.interceptors.response.use((response) => {
+  const { token, account_id } = response.data?.data ?? {};
+  if (token) {
+    localStorage.setItem('api_token', token);
+  }
+  if (account_id) {
+    localStorage.setItem('account_id', String(account_id));
+  }
+  return response;
+});
+
 // Document API
 export const documentApi = {
   getAll: async (params?: { status?: string; document_type?: string; per_page?: number }) => {
@@ -74,6 +99,34 @@ export const comparisonApi = {
       document_ids: documentIds,
       type,
     });
+    return response.data;
+  },
+};
+
+// Auth API
+export const authApi = {
+  login: async (email: string, password: string) => {
+    const response = await api.post('/auth/login', { email, password });
+    return response.data;
+  },
+
+  register: async (name: string, email: string, password: string, accountId: number) => {
+    const response = await api.post('/auth/register', { name, email, password, account_id: accountId });
+    return response.data;
+  },
+
+  logout: async () => {
+    try {
+      await api.post('/auth/logout');
+    } finally {
+      localStorage.removeItem('api_token');
+      localStorage.removeItem('account_id');
+      localStorage.removeItem('user');
+    }
+  },
+
+  me: async () => {
+    const response = await api.get('/auth/me');
     return response.data;
   },
 };
