@@ -16,7 +16,7 @@ from typing import Optional
 
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
+from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST, REGISTRY
 
 from . import config
 from . import models
@@ -24,35 +24,47 @@ from . import converter as converter_mod
 from . import ocr as ocr_mod
 
 
-# ─── Prometheus Metrics ─────────────────────────────────────────────────────────
-REQUEST_COUNT = Counter(
-    'docling_extraction_total',
-    'Total PDF extractions',
-    ['status']  # success, failure
-)
+# ─── Prometheus Metrics (lazy-initialized per worker) ──────────────────────────
+# Metrics are created lazily in lifespan() to avoid duplicate registration
+# when uvicorn forks workers. Each worker process initializes its own metrics.
+REQUEST_COUNT: Optional[Counter] = None
+REQUEST_DURATION: Optional[Histogram] = None
+PDF_PAGE_COUNT: Optional[Histogram] = None
+QUEUE_DEPTH: Optional[Gauge] = None
+OCR_COUNT: Optional[Counter] = None
 
-REQUEST_DURATION = Histogram(
-    'docling_extraction_duration_seconds',
-    'PDF extraction duration',
-    buckets=[1, 5, 10, 30, 60, 120, 300, 600]
-)
 
-PDF_PAGE_COUNT = Histogram(
-    'docling_pdf_pages',
-    'Number of pages in processed PDFs',
-    buckets=[1, 2, 5, 10, 20, 50, 100]
-)
+def _init_metrics():
+    """Initialize metrics lazily - called once per worker process."""
+    global REQUEST_COUNT, REQUEST_DURATION, PDF_PAGE_COUNT, QUEUE_DEPTH, OCR_COUNT
 
-QUEUE_DEPTH = Gauge(
-    'docling_queue_depth',
-    'Current queue depth (active extractions)'
-)
+    # Use _CreatedIfAbsent to avoid duplicate registration in forked processes
+    # This is the safest approach for multiprocess environments
+    if REQUEST_COUNT is None:
+        REQUEST_COUNT = Counter(
+            'docling_extraction_total', 'Total PDF extractions',
+            ['status']
+        )
+    if REQUEST_DURATION is None:
+        REQUEST_DURATION = Histogram(
+            'docling_extraction_duration_seconds', 'PDF extraction duration',
+            buckets=[1, 5, 10, 30, 60, 120, 300, 600]
+        )
+    if PDF_PAGE_COUNT is None:
+        PDF_PAGE_COUNT = Histogram(
+            'docling_pdf_pages', 'Number of pages in processed PDFs',
+            buckets=[1, 2, 5, 10, 20, 50, 100]
+        )
+    if QUEUE_DEPTH is None:
+        QUEUE_DEPTH = Gauge(
+            'docling_queue_depth', 'Current queue depth (active extractions)'
+        )
+    if OCR_COUNT is None:
+        OCR_COUNT = Counter(
+            'docling_ocr_total', 'Total OCR extractions',
+            ['status']
+        )
 
-OCR_COUNT = Counter(
-    'docling_ocr_total',
-    'Total OCR extractions',
-    ['status']  # success, failure, skipped
-)
 
 # ─── Global singletons (initialized in lifespan) ──────────────────────────────
 _io_executor: Optional[ThreadPoolExecutor] = None
@@ -62,6 +74,8 @@ _cpu_executor: Optional[ThreadPoolExecutor] = None
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Initialize on startup, clean up on shutdown — one per worker process."""
+    # Initialize metrics lazily on startup - each worker process calls this
+    _init_metrics()
     global _io_executor, _cpu_executor
 
     converter_mod.init_converter()
