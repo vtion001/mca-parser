@@ -1,2 +1,7 @@
 .env
 backend/.env
+
+# Orphaned/debug files
+backend/mca.txt
+frontend/profile-*.js
+desktop/
