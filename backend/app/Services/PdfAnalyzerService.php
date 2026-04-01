@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use App\Services\PiiPatterns;
+
 class PdfAnalyzerService
 {
     public function analyze(string $text): array
@@ -25,19 +27,7 @@ class PdfAnalyzerService
             return $text;
         }
 
-        $patterns = [
-            '/\b\d{3}-\d{2}-\d{4}\b/' => '[SSN]',
-            '/\b\d{9}\b/' => '[ID]',
-            '/\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b/' => '[CARD]',
-            '/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/' => '[EMAIL]',
-            '/\b\d{3}[-.\s]?\d{3}[-.\s]?\d{4}\b/' => '[PHONE]',
-            '/\b\d{1,2}\/\d{1,2}\/\d{2,4}\b/' => '[DATE]',
-        ];
-
-        $scrubbed = $text;
-        foreach ($patterns as $pattern => $replacement) {
-            $scrubbed = preg_replace($pattern, $replacement, $scrubbed);
-        }
+        $scrubbed = preg_replace(array_keys(PiiPatterns::SCRUB_MAP), array_values(PiiPatterns::SCRUB_MAP), $text);
 
         return $scrubbed;
     }

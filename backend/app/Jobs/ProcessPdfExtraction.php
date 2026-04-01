@@ -17,6 +17,7 @@ use App\Services\ExtractionScorer;
 use App\Services\PdfAnalyzerService;
 use App\Services\BalanceExtractorService;
 use App\Services\OpenRouterService;
+use App\Services\PiiPatterns;
 
 class ProcessPdfExtraction implements ShouldQueue
 {
@@ -251,9 +252,9 @@ class ProcessPdfExtraction implements ShouldQueue
     private function getPiiPatterns(): array
     {
         return [
-            'ssn' => '/\d{3}-\d{2}-\d{4}/',
-            'email' => '/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}/',
-            'phone' => '/\d{3}[-.\s]?\d{3}[-.\s]?\d{4}/',
+            'ssn' => PiiPatterns::SSN,
+            'email' => PiiPatterns::EMAIL,
+            'phone' => PiiPatterns::PHONE,
         ];
     }
 
