@@ -1,0 +1,129 @@
+name: Build & Deploy to Azure
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  ACR_REGISTRY: mcasharpdf0402.azurecr.io
+  AZURE_SUBSCRIPTION: fdd2ce24-33c8-4347-a9b5-a36a822778d6
+  RESOURCE_GROUP: mca-pdf-scrubber-rg
+  LARAVEL_IMAGE: mcasharpdf0402.azurecr.io/laravel:latest
+  DOCLING_IMAGE: mcasharpdf0402.azurecr.io/docling:latest
+  FRONTEND_IMAGE: mcasharpdf0402.azurecr.io/frontend:latest
+
+jobs:
+  # ─── BUILD IMAGES ───────────────────────────────────────────────
+  build:
+    name: Build AMD64 Images
+    runs-on: ubuntu-latest  # AMD64 runners — fast!
+    outputs:
+      laravel: ${{ steps.laravel.outputs.digest }}
+      docling: ${{ steps.docling.outputs.digest }}
+      frontend: ${{ steps.frontend.outputs.digest }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to ACR
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      # ── LARAVEL ──────────────────────────────────────────────────
+      - name: Build Laravel (AMD64)
+        id: laravel
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/Dockerfile.laravel
+          platforms: linux/amd64
+          push: true
+          tags: ${{ env.ACR_REGISTRY }}/laravel:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # ── DOCLING ─────────────────────────────────────────────────
+      - name: Build Docling (AMD64)
+        id: docling
+        uses: docker/build-push-action@v5
+        with:
+          context: python-service
+          platforms: linux/amd64
+          push: true
+          tags: ${{ env.ACR_REGISTRY }}/docling:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # ── FRONTEND ────────────────────────────────────────────────
+      - name: Build Frontend (AMD64)
+        id: frontend
+        uses: docker/build-push-action@v5
+        with:
+          context: frontend
+          platforms: linux/amd64
+          push: true
+          tags: ${{ env.ACR_REGISTRY }}/frontend:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ─── DEPLOY ──────────────────────────────────────────────────────
+  deploy:
+    name: Deploy to Azure Container Apps
+    runs-on: ubuntu-latest
+    needs: build
+    environment: production
+
+    steps:
+      - name: Login to ACR
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Deploy Container Apps
+        run: |
+          az containerapp create \
+            --name mca-laravel \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --environment mca-env \
+            --image ${{ env.LARAVEL_IMAGE }} \
+            --target-port 9000 \
+            --ingress external \
+            --cpu 1.0 --memory 2Gi \
+            --min-replicas 1 --max-replicas 3 \
+            --registry-server ${{ env.ACR_REGISTRY }} \
+            --env-vars "APP_ENV=production" "APP_DEBUG=false" \
+                       "DOCLING_SERVICE_URL=http://mca-docling:8001" \
+            --secrets "openrouter-api-key=${{ secrets.OPENROUTER_API_KEY }}"
+
+          az containerapp create \
+            --name mca-docling \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --environment mca-env \
+            --image ${{ env.DOCLING_IMAGE }} \
+            --target-port 8001 \
+            --cpu 1.0 --memory 2Gi \
+            --min-replicas 2 --max-replicas 5 \
+            --registry-server ${{ env.ACR_REGISTRY }} \
+            --env-vars "PYTHONUNBUFFERED=1"
+
+          az containerapp create \
+            --name mca-frontend \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --environment mca-env \
+            --image ${{ env.FRONTEND_IMAGE }} \
+            --target-port 80 \
+            --ingress external \
+            --cpu 0.5 --memory 1Gi \
+            --min-replicas 1 --max-replicas 3 \
+            --registry-server ${{ env.ACR_REGISTRY }}
+
+      - name: Get App URLs
+        run: |
+          LARAVEL_URL=$(az containerapp show --name mca-laravel --resource-group ${{ env.RESOURCE_GROUP }} --query properties.fqdn -o tsv)
+          echo "🚀 App URL: https://$LARAVEL_URL"
