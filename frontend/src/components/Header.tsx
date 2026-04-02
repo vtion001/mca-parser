@@ -5,7 +5,7 @@ export function Header() {
         <div className="flex items-center gap-4">
           <img
             src="https://res.cloudinary.com/dbviya1rj/image/upload/v1775062877/gm3qwskgtgktqezpjmoo.png"
-            alt="Doc Scrappy Logo"
+            alt="Dave Logo"
             className="w-24 h-24 object-contain"
           />
           <div>
