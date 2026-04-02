@@ -1,0 +1,44 @@
+name: mca-pdf-scrubber
+version: v1.0.0
+metadata:
+  template: mca-pdf-scrubber
+
+services:
+  app:
+    project: .
+    language: custom
+    host: containerapp
+    docker:
+      composePath: docker-compose.yml
+    ingress:
+      external: true
+      targetPort: 8000
+    env:
+      - name: APP_ENV
+        value: production
+      - name: APP_DEBUG
+        value: "false"
+      - name: DOCLING_SERVICE_URL
+        value: "http://docling:8001"
+      - name: DB_CONNECTION
+        value: pgsql
+      - name: DB_HOST
+        value: ${DB_HOST}
+      - name: DB_PORT
+        value: "5432"
+      - name: DB_DATABASE
+        value: postgres
+      - name: DB_USERNAME
+        secretRef: db-username
+      - name: DB_PASSWORD
+        secretRef: db-password
+    secrets:
+      - name: openrouter-api-key
+        value: ${OPENROUTER_API_KEY}
+      - name: db-username
+        value: ${DB_USERNAME}
+      - name: db-password
+        value: ${DB_PASSWORD}
+
+resourceGroup: mca-pdf-scrubber-rg
+location: southeastasia
