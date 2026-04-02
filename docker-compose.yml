@@ -13,12 +13,6 @@ services:
     networks:
       - mca-network
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost/health"]
-      interval: 15s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
     deploy:
       resources:
         limits:
@@ -32,12 +26,6 @@ services:
     networks:
       - mca-network
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:80"]
-      interval: 15s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
     deploy:
       resources:
         limits:
@@ -49,14 +37,14 @@ services:
       context: .
       dockerfile: docker/Dockerfile.laravel
     environment:
-      - APP_ENV=production
-      - APP_DEBUG=false
-      - DB_CONNECTION=mysql
-      - DB_HOST=mysql
-      - DB_PORT=3306
-      - DB_DATABASE=${DB_DATABASE:-mca_pdf_scrubber}
-      - DB_USERNAME=${DB_USERNAME:-mca}
-      - DB_PASSWORD=${DB_PASSWORD:?DB_PASSWORD is required}
+      - APP_ENV=local
+      - APP_DEBUG=true
+      - DB_CONNECTION=pgsql
+      - DB_HOST=${SUPABASE_DB_HOST:-aws-1-ap-northeast-2.pooler.supabase.com}
+      - DB_PORT=${SUPABASE_DB_PORT:-6543}
+      - DB_DATABASE=postgres
+      - DB_USERNAME=${SUPABASE_DB_USER:-postgres.jcstvjvfmwrtkrmdrbte}
+      - DB_PASSWORD=${SUPABASE_DB_PASSWORD:?Supabase DB password required}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - CACHE_DRIVER=redis
@@ -66,43 +54,33 @@ services:
     volumes:
       - ./backend:/var/www/html
     depends_on:
-      mysql:
-        condition: service_healthy
       redis:
         condition: service_healthy
       docling-lb:
-        condition: service_healthy
+        condition: service_started
     networks:
       - mca-network
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 15s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
     deploy:
       resources:
         limits:
           memory: 512M
 
-  # Laravel queue workers - scaled via --scale flag or Swarm
-  # To scale: docker-compose up -d --scale laravel-worker=10
-  # Or for Swarm: docker stack deploy -c docker-compose.yml mca
+  # Laravel queue workers
   laravel-worker:
     build:
       context: .
       dockerfile: docker/Dockerfile.laravel
     command: supervisord -c /etc/supervisor/supervisord.conf
     environment:
-      - APP_ENV=production
-      - APP_DEBUG=false
-      - DB_CONNECTION=mysql
-      - DB_HOST=mysql
-      - DB_PORT=3306
-      - DB_DATABASE=${DB_DATABASE:-mca_pdf_scrubber}
-      - DB_USERNAME=${DB_USERNAME:-mca}
-      - DB_PASSWORD=${DB_PASSWORD:?DB_PASSWORD is required}
+      - APP_ENV=local
+      - APP_DEBUG=true
+      - DB_CONNECTION=pgsql
+      - DB_HOST=${SUPABASE_DB_HOST:-aws-1-ap-northeast-2.pooler.supabase.com}
+      - DB_PORT=${SUPABASE_DB_PORT:-6543}
+      - DB_DATABASE=postgres
+      - DB_USERNAME=${SUPABASE_DB_USER:-postgres.jcstvjvfmwrtkrmdrbte}
+      - DB_PASSWORD=${SUPABASE_DB_PASSWORD:?Supabase DB password required}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - CACHE_DRIVER=redis
@@ -113,12 +91,10 @@ services:
       - ./backend:/var/www/html
       - ./docker/laravel/supervisord.conf:/etc/supervisor/supervisord.conf:ro
     depends_on:
-      mysql:
-        condition: service_healthy
       redis:
         condition: service_healthy
       docling-lb:
-        condition: service_healthy
+        condition: service_started
     networks:
       - mca-network
     restart: unless-stopped
@@ -141,18 +117,12 @@ services:
       - docling-4
       - docling-5
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
-      interval: 15s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
     deploy:
       resources:
         limits:
           memory: 64M
 
-  # Docling replica 1
+  # Docling replicas 1-5
   docling-1:
     build:
       context: ./python-service
@@ -163,7 +133,7 @@ services:
       - mca-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8001/health || exit 1"]
       interval: 15s
       timeout: 10s
       retries: 3
@@ -173,7 +143,6 @@ services:
         limits:
           memory: 2G
 
-  # Docling replica 2
   docling-2:
     build:
       context: ./python-service
@@ -184,7 +153,7 @@ services:
       - mca-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8001/health || exit 1"]
       interval: 15s
       timeout: 10s
       retries: 3
@@ -194,7 +163,6 @@ services:
         limits:
           memory: 2G
 
-  # Docling replica 3
   docling-3:
     build:
       context: ./python-service
@@ -205,7 +173,7 @@ services:
       - mca-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8001/health || exit 1"]
       interval: 15s
       timeout: 10s
       retries: 3
@@ -215,7 +183,6 @@ services:
         limits:
           memory: 2G
 
-  # Docling replica 4
   docling-4:
     build:
       context: ./python-service
@@ -226,7 +193,7 @@ services:
       - mca-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8001/health || exit 1"]
       interval: 15s
       timeout: 10s
       retries: 3
@@ -236,7 +203,6 @@ services:
         limits:
           memory: 2G
 
-  # Docling replica 5
   docling-5:
     build:
       context: ./python-service
@@ -247,7 +213,7 @@ services:
       - mca-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8001/health || exit 1"]
       interval: 15s
       timeout: 10s
       retries: 3
@@ -256,29 +222,6 @@ services:
       resources:
         limits:
           memory: 2G
-
-  # MySQL database
-  mysql:
-    image: mysql:8.0
-    environment:
-      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required}
-      - MYSQL_DATABASE=${DB_DATABASE:-mca_pdf_scrubber}
-      - MYSQL_USER=${DB_USERNAME:-mca}
-      - MYSQL_PASSWORD=${DB_PASSWORD:?DB_PASSWORD is required}
-    volumes:
-      - mysql_data:/var/lib/mysql
-    networks:
-      - mca-network
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          memory: 1G
 
   # Redis for caching and queues
   redis:
@@ -303,5 +246,4 @@ networks:
     driver: bridge
 
 volumes:
-  mysql_data:
   redis_data:
