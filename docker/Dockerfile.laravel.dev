@@ -6,6 +6,7 @@ WORKDIR /var/www/html
 RUN apt-get update && apt-get install -y \
     git \
     curl \
+    wget \
     libpng-dev \
     libonig-dev \
     libxml2-dev \
@@ -21,13 +22,15 @@ RUN docker-php-ext-install mbstring exif pcntl bcmath gd sockets pdo pdo_mysql p
 RUN pecl install redis && docker-php-ext-enable redis
 
 # Install Composer
-RUN curl -sS https://getcomposer.org/installer | php --install-dir=/usr/local/bin --filename=composer
+RUN php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');" \
+ && php composer-setup.php --install-dir=/usr/local/bin --filename=composer \
+ && rm composer-setup.php
 
-# Copy and install dependencies
+# Copy and install Laravel deps
 COPY backend/composer.json backend/composer.lock ./
-RUN composer install --no-dev --optimize-autoloader
+RUN composer install --no-dev --optimize-autoloader --no-scripts
 
-# Copy application code
+# Copy full Laravel app
 COPY backend/ .
 
 # Generate application key
@@ -35,5 +38,5 @@ RUN php artisan key:generate --force
 
 EXPOSE 9000
 
-# Run Laravel dev server (auto-reloads on file change)
+# php artisan serve auto-reloads on file change
 CMD ["php", "artisan", "serve", "--host=0.0.0.0", "--port=9000"]
