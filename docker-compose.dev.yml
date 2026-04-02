@@ -1,0 +1,148 @@
+services:
+  # ─────────────────────────────────────────────────────────────────────────
+  # LARAVEL DEV — php artisan serve (auto-reload on code change)
+  # ─────────────────────────────────────────────────────────────────────────
+  laravel-dev:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.laravel.dev
+    environment:
+      - APP_ENV=local
+      - APP_DEBUG=true
+      - PHP_OPCACHE_ENABLE=0
+      - PHP_OPCACHE_REVALIDATE_FREQ=0
+      - DB_CONNECTION=pgsql
+      - DB_HOST=${SUPABASE_DB_HOST:-aws-1-ap-northeast-2.pooler.supabase.com}
+      - DB_PORT=${SUPABASE_DB_PORT:-6543}
+      - DB_DATABASE=postgres
+      - DB_USERNAME=${SUPABASE_DB_USER:-postgres.jcstvjvfmwrtkrmdrbte}
+      - DB_PASSWORD=${SUPABASE_DB_PASSWORD:?Supabase DB password required}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - CACHE_DRIVER=redis
+      - QUEUE_CONNECTION=redis
+      - DOCLING_SERVICE_URL=http://docling-lb:8001
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:?OPENROUTER_API_KEY required}
+    volumes:
+      - ./backend:/var/www/html:cached
+    depends_on:
+      redis:
+        condition: service_healthy
+      docling-lb:
+        condition: service_started
+    ports:
+      - "9000:9000"
+    networks:
+      - mca-network
+    restart: unless-stopped
+    profiles:
+      - dev
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # LARAVEL WORKER DEV — queue worker with auto-reload
+  # ─────────────────────────────────────────────────────────────────────────
+  laravel-worker-dev:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.laravel.dev
+    command: php artisan queue:work --tries=3 --delay=2 --sleep=3
+    environment:
+      - APP_ENV=local
+      - APP_DEBUG=true
+      - PHP_OPCACHE_ENABLE=0
+      - DB_CONNECTION=pgsql
+      - DB_HOST=${SUPABASE_DB_HOST:-aws-1-ap-northeast-2.pooler.supabase.com}
+      - DB_PORT=${SUPABASE_DB_PORT:-6543}
+      - DB_DATABASE=postgres
+      - DB_USERNAME=${SUPABASE_DB_USER:-postgres.jcstvjvfmwrtkrmdrbte}
+      - DB_PASSWORD=${SUPABASE_DB_PASSWORD:?Supabase DB password required}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - CACHE_DRIVER=redis
+      - QUEUE_CONNECTION=redis
+      - DOCLING_SERVICE_URL=http://docling-lb:8001
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:?OPENROUTER_API_KEY required}
+    volumes:
+      - ./backend:/var/www/html:cached
+    depends_on:
+      redis:
+        condition: service_healthy
+      docling-lb:
+        condition: service_started
+    networks:
+      - mca-network
+    restart: unless-stopped
+    profiles:
+      - dev
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # FRONTEND DEV — Vite hot reload (auto-updates on React code change)
+  # ─────────────────────────────────────────────────────────────────────────
+  frontend-dev:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ./frontend:/app:cached
+      - /app/node_modules
+    ports:
+      - "4200:4200"
+    environment:
+      - WATCHPACK_POLLING=true
+    networks:
+      - mca-network
+    restart: unless-stopped
+    profiles:
+      - dev
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # DEV WATCHER — watches docling Python code, auto-rebuilds on change
+  # ─────────────────────────────────────────────────────────────────────────
+  docling-watcher:
+    image: alpine:latest
+    volumes:
+      - ./python-service:/watchdir:cached
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - .:/repo:ro
+    command: >
+      sh -c "
+        apk add --no-cache inotify-tools watchexec bash &&
+        echo '👀 Watching python-service/ for changes...' &&
+        watchexec -w /watchdir/src --exts py -r 'docker compose -f /repo/docker-compose.yml restart docling-1 docling-2 docling-3 docling-4 docling-5 2>&1' &
+        watchexec -w /watchdir --exts py -r 'docker compose -f /repo/docker-compose.yml up -d --build docling-1 docling-2 docling-3 docling-4 docling-5 2>&1' &
+        tail -f /dev/null
+      "
+    environment:
+      - DOCKER_HOST=unix:///var/run/docker.sock
+    profiles:
+      - dev
+    networks:
+      - mca-network
+    restart: unless-stopped
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # NGINX DEV — reverse proxy for dev services
+  # ─────────────────────────────────────────────────────────────────────────
+  nginx-dev:
+    image: nginx:alpine
+    ports:
+      - "8000:80"
+    volumes:
+      - ./docker/nginx.dev.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - laravel-dev
+      - frontend-dev
+      - docling-lb
+    networks:
+      - mca-network
+    restart: unless-stopped
+    profiles:
+      - dev
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+
+networks:
+  mca-network:
+    external: false
