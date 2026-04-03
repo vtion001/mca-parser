@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../services/api';
 import { BatchDocumentList } from './batch/BatchDocumentList';
 import { BatchCreator } from './batch/BatchCreator';
 import { BatchProgress, BatchComplete, Batch } from './batch/BatchProgress';
@@ -52,7 +52,7 @@ export function BatchProcessor({ onComplete }: BatchProcessorProps) {
     setUploading(true);
     try {
       // Create batch via backend API
-      const createResponse = await axios.post('/api/v1/batches', {
+      const createResponse = await api.post('/batches', {
         name: batchName || `Batch ${new Date().toLocaleDateString()}`,
         document_ids: selectedIds,
       });
@@ -60,13 +60,13 @@ export function BatchProcessor({ onComplete }: BatchProcessorProps) {
       const createdBatch: Batch = createResponse.data.data;
 
       // Fetch full batch with documents
-      const batchResponse = await axios.get(`/api/v1/batches/${createdBatch.id}`);
+      const batchResponse = await api.get(`/batches/${createdBatch.id}`);
       const fullBatch: Batch = batchResponse.data.data;
 
       setBatch(fullBatch);
 
       // Start processing via backend API
-      await axios.post(`/api/v1/batches/${createdBatch.id}/process`);
+      await api.post(`/batches/${createdBatch.id}/process`);
 
       setStep('processing');
     } catch (error) {
@@ -81,7 +81,7 @@ export function BatchProcessor({ onComplete }: BatchProcessorProps) {
 
     const interval = setInterval(async () => {
       try {
-        const response = await axios.get(`/api/v1/batches/${batch.id}/progress`);
+        const response = await api.get(`/batches/${batch.id}/progress`);
         const progressData = response.data.data;
 
         setBatch(prev => {

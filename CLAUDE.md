@@ -11,7 +11,7 @@ MCA PDF Scrubber is a full-stack application for uploading PDF documents and per
 ```
 Browser → nginx:8000 → React (frontend) or Laravel (API)
                       → Python Docling Service (:8001)
-                      → MySQL/Redis (data/cache)
+                      → Supabase PostgreSQL/Redis (data/cache)
 ```
 
 **In Docker:** nginx reverse proxy on port 8000 routes to frontend, Laravel API, and Docling service.
@@ -25,10 +25,10 @@ Browser → nginx:8000 → React (frontend) or Laravel (API)
 
 ## Tech Stack
 
-- **Frontend:** React 18 + TypeScript + Tailwind CSS
-- **Backend:** Laravel 11 (PHP 8.2+) + MySQL 8.0 + Redis
+- **Frontend:** React 18 + TypeScript + Tailwind CSS (app name: "Dave")
+- **Backend:** Laravel 11 (PHP 8.2+) + SQLite (local) / Supabase PostgreSQL (production) + Redis
 - **PDF Extraction:** Python Docling service (FastAPI + docling library + EasyOCR)
-- **AI Analysis:** OpenRouterService (extends BaseAIService) using Google Gemini 3.1 Pro for document analysis
+- **AI Analysis:** OpenRouterService (extends BaseAIService) using OpenAI GPT-3.5 Turbo by default (configurable via `OPENROUTER_MODEL`)
 
 ## Commands
 
@@ -97,11 +97,20 @@ Requirements: Python 3.10+, PyTorch 2.0+, Docling 2.0+
 - **DoclingService.php** - HTTP client to Python Docling service (600s timeout for large PDFs)
 - **PdfAnalyzerService.php** - Regex-based PII detection (SSN, credit cards, emails, phones, dates)
 - **BaseAIService.php** - Abstract base for AI document analysis; provides fallback analysis when API unavailable
-- **OpenRouterService.php** - OpenRouter AI service (Google Gemini 3.1 Pro)
+- **OpenRouterService.php** - OpenRouter AI service (configurable model via `OPENROUTER_MODEL`)
+- **McaAiService.php** - AI-powered MCA (Merchant Cash Advance) analysis and detection service
+- **McaDetectionService.php** - Pattern-based MCA finding detection using configurable criteria
+- **TransactionClassificationService.php** - Classifies transactions into categories (MCA, NSF, transfers, etc.)
 - **BalanceExtractorService.php** - Extracts balance figures from documents
 - **DocumentTypeDetector.php** - Classifies document types
-- **FieldMapper.php** - Maps extracted fields based on document type
+- **FieldMapper.php** - Maps extracted fields based on document type; delegates to FieldMappers/
+- **FieldMappers/** - Subdirectory with specialized parsers:
+  - **BankStatementTableParser.php** - Parses table structures in bank statements
+  - **FieldValueCleaner.php** - Cleans and normalizes extracted field values
+  - **GarbageDetector.php** - Identifies and filters garbage/unreliable extractions
+  - **HeadingParser.php** - Parses document headings and section headers
 - **ExtractionScorer.php** - Scores extraction quality and PII detection
+- **PiiPatterns.php** - Shared PII regex pattern definitions used across services
 - **AccountMiddleware.php** - Multi-tenancy via `X-Account-ID` header; validates user-account ownership after auth
 - **AuthMiddleware.php** - Bearer token authentication; validates `api_token` on every request
 
@@ -171,7 +180,7 @@ User authentication via Bearer token (`api_token`) + account ownership validatio
 | Laravel Workers | --scale | 10/pod | Queue job processing |
 | Docling Service | 5 | - | PDF text extraction via load balancer |
 | Redis | 1 | - | Cache + Queue |
-| MySQL | 1 | - | Persistent storage |
+| Supabase PostgreSQL | 1 | - | Persistent storage |
 
 ## Docker Environment Variables
 
@@ -180,10 +189,11 @@ Required environment variables for Docker Compose (set in `.env` or shell):
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `OPENROUTER_API_KEY` | Yes | OpenRouter API key for AI analysis |
-| `DB_PASSWORD` | Yes | MySQL database password |
-| `MYSQL_ROOT_PASSWORD` | Yes | MySQL root password |
-| `DB_DATABASE` | No | Database name (default: `mca_pdf_scrubber`) |
-| `DB_USERNAME` | No | Database username (default: `mca`) |
+| `SUPABASE_DB_HOST` | Yes | Supabase PostgreSQL host |
+| `SUPABASE_DB_PORT` | Yes | Supabase PostgreSQL port |
+| `SUPABASE_DB_USER` | Yes | Supabase PostgreSQL user |
+| `SUPABASE_DB_PASSWORD` | Yes | Supabase PostgreSQL password |
+| `OPENROUTER_MODEL` | No | Model to use (default: `openai/gpt-3.5-turbo`) |
 
 ## Development Workflow
 
@@ -191,6 +201,18 @@ Required environment variables for Docker Compose (set in `.env` or shell):
 1. Run `/code-review:code-review` to check production readiness
 2. Fix any issues flagged with confidence >= 75
 3. Update this CLAUDE.md if new patterns, services, or architecture are introduced
+
+### Deployment
+
+**Azure Container Apps deployment via `azd`:**
+```bash
+azd up  # Deploy to Azure
+```
+
+Configuration files:
+- `azure.yaml` - Azure Developer CLI configuration
+- `.github/workflows/deploy.yml` - GitHub Actions CI/CD pipeline
+- `infra/` - Infrastructure as Code (Bicep/ARM templates)
 
 ### Custom Agents
 

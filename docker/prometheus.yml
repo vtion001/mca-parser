@@ -1,0 +1,33 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []
+
+rule_files: []
+
+scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Docling service metrics (3 replicas)
+  - job_name: 'docling'
+    static_configs:
+      - targets: ['docling-1:8001', 'docling-2:8001', 'docling-3:8001']
+    metrics_path: '/metrics'
+
+  # Laravel API metrics (if exposed)
+  - job_name: 'laravel'
+    static_configs:
+      - targets: ['laravel:8000']
+    metrics_path: '/metrics'
+
+  # Redis metrics (via redis_exporter if available)
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis:6379']

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../services/api';
 import type { ExtractionResult } from '../types/extraction';
 import type { StatementRow } from './statements/types';
 import { StatementCard } from './statements/StatementCard';
@@ -48,7 +48,7 @@ export function StatementsView({ result, onReviewStatement }: StatementsViewProp
   const handleDelete = async (id: number) => {
     if (!window.confirm('Delete this statement? This cannot be undone.')) return;
     try {
-      await axios.delete(`/api/v1/documents/${id}`);
+      await api.delete(`/documents/${id}`);
       setDocuments(prev => prev.filter(d => d.id !== id));
     } catch (err) {
       console.error('Failed to delete document:', err);
@@ -65,7 +65,7 @@ export function StatementsView({ result, onReviewStatement }: StatementsViewProp
   useEffect(() => {
     async function fetchDocuments() {
       try {
-        const response = await axios.get('/api/v1/documents', {
+        const response = await api.get('/documents', {
           params: { per_page: 50, status: 'complete' },
         });
         const docs = response.data.data ?? [];

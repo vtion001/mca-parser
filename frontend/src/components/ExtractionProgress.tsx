@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo, memo } from 'react';
 
 const STAGES = [
   { key: 'uploading',    label: 'Uploading PDF',         description: 'Transferring file to server',       icon: '↑' },
@@ -29,7 +29,7 @@ interface ExtractionProgressProps {
   stage?: string;
 }
 
-export function ExtractionProgress({ stageLabel, progressPercent, currentMarkdown, stage }: ExtractionProgressProps) {
+export const ExtractionProgress = memo(function ExtractionProgress({ stageLabel, progressPercent, currentMarkdown, stage }: ExtractionProgressProps) {
   const startMs = useRef(Date.now());
   const [elapsed, setElapsed] = useState('');
 
@@ -46,10 +46,14 @@ export function ExtractionProgress({ stageLabel, progressPercent, currentMarkdow
   const currentIdx = stageIndex(stage ?? '');
   const isComplete = progressPercent >= 100;
 
-  // Determine preview snippet from markdown
-  const previewSnippet = currentMarkdown
-    ? (currentMarkdown.length > 300 ? currentMarkdown.slice(-300) : currentMarkdown)
-    : null;
+  // Memoize preview snippet to avoid recalculating on every render
+  const previewSnippet = useMemo(
+    () => (currentMarkdown && currentMarkdown.length > 300 ? currentMarkdown.slice(-300) : currentMarkdown || null),
+    [currentMarkdown]
+  );
+
+  // Memoize char count display
+  const charCount = useMemo(() => currentMarkdown?.length ?? 0, [currentMarkdown]);
 
   return (
     <div className="bg-white rounded-xl p-6 border border-bw-100 shadow-card">
@@ -131,7 +135,7 @@ export function ExtractionProgress({ stageLabel, progressPercent, currentMarkdow
         <div className="mt-4">
           <div className="flex items-center justify-between mb-2">
             <p className="text-xs text-bw-500 uppercase tracking-wider font-semibold">Extracted Text Preview</p>
-            <span className="text-[10px] text-bw-400">{currentMarkdown.length.toLocaleString()} chars</span>
+            <span className="text-[10px] text-bw-400">{charCount.toLocaleString()} chars</span>
           </div>
           <pre className="text-xs text-bw-600 bg-bw-50 p-4 rounded-lg border border-bw-100 overflow-auto max-h-32 font-mono leading-relaxed">
             {previewSnippet}
@@ -140,4 +144,4 @@ export function ExtractionProgress({ stageLabel, progressPercent, currentMarkdow
       )}
     </div>
   );
-}
+});

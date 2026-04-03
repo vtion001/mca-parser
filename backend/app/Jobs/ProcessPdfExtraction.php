@@ -19,12 +19,14 @@ use App\Services\BalanceExtractorService;
 use App\Services\OpenRouterService;
 use App\Services\PiiPatterns;
 use App\Services\McaAiService;
+use App\Services\TransactionClassificationService;
 
 class ProcessPdfExtraction implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public int $tries = 1;
+    public int $tries = 3;
+    public int $backoff = 30; // seconds between retries
     public int $timeout = 300;
 
     private string $jobId;
@@ -48,7 +50,8 @@ class ProcessPdfExtraction implements ShouldQueue
         PdfAnalyzerService $analyzer,
         BalanceExtractorService $balanceExtractor,
         OpenRouterService $openRouterService,
-        McaAiService $mcaAiService
+        McaAiService $mcaAiService,
+        TransactionClassificationService $txnClassifier
     ): void {
         try {
             $this->updateProgress('extracting', 'Extracting text from PDF...', 10);
@@ -132,9 +135,27 @@ class ProcessPdfExtraction implements ShouldQueue
                 $balances
             );
 
+            // Fallback: If AI analysis failed or returned null transaction_summary,
+            // compute basic transaction totals from extracted transactions
+            if (!$aiAnalysis['success'] ||
+                !isset($aiAnalysis['analysis']['transaction_summary']) ||
+                $aiAnalysis['analysis']['transaction_summary']['credit_count'] === null) {
+                $txnSummary = $mcaAiService->extractTransactionSummary($fullMarkdown);
+                // Apply fallback only when AI analysis succeeded but returned null summary
+                // (otherwise we don't have a valid analysis object to attach it to)
+                if ($aiAnalysis['success'] && isset($aiAnalysis['analysis'])) {
+                    $aiAnalysis['analysis']['transaction_summary'] = $txnSummary;
+                    $aiAnalysis['fallback_transaction_summary'] = true;
+                }
+            }
+
             // MCA Detection (hybrid pre-filter + AI)
             $this->updateProgress('mca_detection', 'Detecting MCA transactions...', 92);
             $mcaFindings = $mcaAiService->detect($fullMarkdown, $keyDetails, $balances);
+
+            // Transaction Classification (RETURN, WIRE, INTERNAL_TRANSFER, etc.)
+            $this->updateProgress('txn_classification', 'Classifying transactions...', 95);
+            $transactionClassification = $txnClassifier->detect($fullMarkdown);
 
             $this->updateProgress('complete', 'Done', 100);
 
@@ -149,6 +170,7 @@ class ProcessPdfExtraction implements ShouldQueue
                 'balances' => $balances,
                 'ai_analysis' => $aiAnalysis,
                 'mca_findings' => $mcaFindings,
+                'transaction_classification' => $transactionClassification,
                 'page_count' => $pageCount,
             ];
 

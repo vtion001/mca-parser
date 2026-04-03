@@ -1,5 +1,6 @@
 import { useCallback, useRef } from 'react';
-import axios from 'axios';
+import api from '../services/api';
+import { isAxiosError } from 'axios';
 import type { ExtractionState, ProgressResponse } from '../types/extraction';
 
 interface UseExtractionPollingDeps {
@@ -16,11 +17,22 @@ export function useExtractionPolling({ setState, clearPolling, pollingRef }: Use
       consecutiveErrorsRef.current = 0;
       const maxConsecutiveErrors = 10; // stop after 5s of 404s (job never picked up)
 
+      // Throttle: only update markdown if it has changed (string comparison)
+      // This prevents unnecessary re-renders when content hasn't changed
+      let lastMarkdownLength = 0;
+
       pollingRef.current = setInterval(async () => {
         try {
-          const response = await axios.get<ProgressResponse>(`/api/v1/pdf/progress/${jobId}`);
+          const response = await api.get<ProgressResponse>(`/pdf/progress/${jobId}`);
           const data = response.data;
           consecutiveErrorsRef.current = 0; // reset on success
+
+          // Only update markdown if it actually changed - skip DOM update if identical
+          const newMarkdown = data.current_markdown || '';
+          const markdownChanged = newMarkdown.length !== lastMarkdownLength;
+          if (markdownChanged) {
+            lastMarkdownLength = newMarkdown.length;
+          }
 
           setState(prev => ({
             ...prev,
@@ -28,7 +40,7 @@ export function useExtractionPolling({ setState, clearPolling, pollingRef }: Use
             stage: data.stage,
             stageLabel: data.stage_label,
             progressPercent: data.progress_percent,
-            currentMarkdown: data.current_markdown || prev.currentMarkdown,
+            currentMarkdown: markdownChanged ? newMarkdown : prev.currentMarkdown,
             result: data.result,
             error: data.error || null,
           }));
@@ -41,7 +53,7 @@ export function useExtractionPolling({ setState, clearPolling, pollingRef }: Use
           consecutiveErrorsRef.current++;
           // 404 means job dispatched but queue worker hasn't created cache entry yet
           // Keep polling — the worker will process it shortly
-          if (axios.isAxiosError(err) && err.response?.status === 404) {
+          if (isAxiosError(err) && err.response?.status === 404) {
             if (consecutiveErrorsRef.current >= maxConsecutiveErrors) {
               clearPolling();
               setState(prev => ({
@@ -62,7 +74,7 @@ export function useExtractionPolling({ setState, clearPolling, pollingRef }: Use
           }));
           resolve(null);
         }
-      }, 500);
+      }, 1500); // Increased from 500ms to 1500ms to reduce main thread blocking
     });
   }, [setState, clearPolling, pollingRef]);
 

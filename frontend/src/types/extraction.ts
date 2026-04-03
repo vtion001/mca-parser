@@ -46,6 +46,7 @@ export interface ExtractionResult {
     error?: string;
   };
   mca_findings?: McaFindings;
+  transaction_classification?: TransactionClassificationResult;
   page_count: number;
 }
 
@@ -115,6 +116,36 @@ export interface McaFindings {
     ai_reviewed_candidates?: number;
     ai_confirmed_mca?: number;
   };
+}
+
+export type TransactionTag = 'return' | 'internal_transfer' | 'wire' | 'line_of_credit' | 'lender' | 'cash_app';
+
+export interface ClassifiedTransaction {
+  description: string;
+  amount: number | null;
+  date: string | null;
+  classification: {
+    tags: TransactionTag[];
+    is_classified: boolean;
+    confidence: number;
+    has_withdrawal: boolean;
+    has_deposit: boolean;
+  };
+}
+
+export interface TransactionClassificationSummary {
+  total: number;
+  return: number;
+  internal_transfer: number;
+  wire: number;
+  line_of_credit: number;
+  lender: number;
+  cash_app: number;
+}
+
+export interface TransactionClassificationResult {
+  transactions: ClassifiedTransaction[];
+  summary: TransactionClassificationSummary;
 }
 
 export interface ProgressResponse {

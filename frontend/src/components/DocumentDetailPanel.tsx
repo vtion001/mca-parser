@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import axios from 'axios';
+import api from '../services/api';
 import { DetailTabNav, type DetailTabId } from './detail/DetailTabNav';
 import { DetailMarkdownTab } from './detail/DetailMarkdownTab';
 import { DetailKeyDetailsTab } from './detail/DetailKeyDetailsTab';
@@ -45,7 +45,7 @@ export function DocumentDetailPanel({ documentId, onClose }: DocumentDetailPanel
     setError(null);
     setDocument(null);
 
-    axios.get(`/api/v1/documents/${documentId}`)
+    api.get(`/documents/${documentId}`)
       .then(res => {
         setDocument(res.data.data);
         setLoading(false);

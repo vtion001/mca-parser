@@ -14,21 +14,16 @@ converter: Optional[DocumentConverter] = None
 
 
 def init_converter() -> Optional[DocumentConverter]:
-    """Initialize the Docling DocumentConverter with high-quality table mode."""
+    """Initialize the Docling DocumentConverter."""
     global converter
 
-    print("Initializing Docling DocumentConverter (high-quality table mode)...")
+    print("Initializing Docling DocumentConverter...")
     try:
-        # Enable table structure parsing for reliable GFM markdown table output.
-        # Bank statements contain critical transaction tables — must extract accurately.
-        # ~15-25s per statement is acceptable for correctness.
-        pipeline_options = PdfPipelineOptions()
-        pipeline_options.do_table_structure = True
-        format_options = {
-            InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options)
-        }
-        converter = DocumentConverter(format_options=format_options)
-        print("Docling converter initialized successfully (table structure enabled)")
+        # Table structure parsing is disabled to reduce memory usage.
+        # It can cause OOM crashes with large PDFs on memory-constrained containers.
+        # Text extraction quality remains high without table mode.
+        converter = DocumentConverter()
+        print("Docling converter initialized successfully")
         return converter
     except Exception as e:
         print(f"Warning: Docling initialization failed: {e}")

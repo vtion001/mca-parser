@@ -4,6 +4,7 @@ WORKDIR /app
 
 # Install system dependencies in a single layer
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
     build-essential \
     libxcb1 \
     libxcb-xinerama0 \

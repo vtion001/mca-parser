@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
-import axios from 'axios';
+import api from '../services/api';
 import { useTheme } from '../hooks/useTheme';
 import { useExtractionContext } from '../contexts/ExtractionContext';
 import { ExtractionProgress } from './ExtractionProgress';
@@ -49,13 +49,16 @@ export function UploadSection() {
         file => file.type === 'application/pdf'
       );
       if (pdfFiles.length > 0) {
+        // Only reset if not currently processing - otherwise we'd interrupt the batch
+        if (state.status !== 'processing') {
+          reset();
+        }
         setFiles(pdfFiles);
         setResult(null);
         setScrubbedText('');
-        reset();
       }
     }
-  }, [reset]);
+  }, [reset, state.status]);
 
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -63,13 +66,18 @@ export function UploadSection() {
         file => file.type === 'application/pdf'
       );
       if (pdfFiles.length > 0) {
+        // Only reset if not currently processing - otherwise we'd interrupt the batch
+        if (state.status !== 'processing') {
+          reset();
+        }
         setFiles(pdfFiles);
         setResult(null);
         setScrubbedText('');
-        reset();
       }
     }
-  }, [reset]);
+    // Reset input so same file can be selected again
+    e.target.value = '';
+  }, [reset, state.status]);
 
   const handleFullExtract = async () => {
     if (!files.length) return;
@@ -91,7 +99,7 @@ export function UploadSection() {
     formData.append('remove_pii', 'true');
 
     try {
-      const response = await axios.post('/api/v1/pdf/analyze', formData, {
+      const response = await api.post('/pdf/analyze', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       setResult(response.data.analysis);
@@ -111,7 +119,7 @@ export function UploadSection() {
     formData.append('remove_pii', 'true');
 
     try {
-      const response = await axios.post('/api/v1/pdf/scrub', formData, {
+      const response = await api.post('/pdf/scrub', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       setScrubbedText(response.data.scrubbed_text);
@@ -279,7 +287,7 @@ export function UploadSection() {
       {/* Extraction Error */}
       {state.status === 'failed' && (
         <div className="bg-red-50 rounded-xl p-6 border border-red-200">
-          <p className="text-red-600 text-sm font-medium">Extraction failed: {state.error}</p>
+          <p className="text-red-600 text-sm font-medium">{state.error}</p>
         </div>
       )}
 

@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import axios from 'axios';
+import api from '../services/api';
 import { useExtractionState } from './useExtractionState';
 import { useExtractionPolling } from './useExtractionPolling';
 
@@ -34,8 +34,8 @@ export function useExtraction() {
     formData.append('file', file);
 
     try {
-      const response = await axios.post<{ job_id: string }>(
-        '/api/v1/pdf/full-extract',
+      const response = await api.post<{ job_id: string }>(
+        '/pdf/full-extract',
         formData,
         { headers: { 'Content-Type': 'multipart/form-data' } }
       );
@@ -58,6 +58,9 @@ export function useExtraction() {
 
   const startBatchExtraction = useCallback(async (files: File[]) => {
     if (files.length === 0) return;
+
+    // Guard against re-entrancy - if already processing, ignore
+    if (state.status === 'processing') return;
 
     setBatchResults([]);
     currentFileIndexRef.current = 0;
@@ -84,8 +87,8 @@ export function useExtraction() {
       formData.append('file', file);
 
       try {
-        const response = await axios.post<{ job_id: string }>(
-          '/api/v1/pdf/full-extract',
+        const response = await api.post<{ job_id: string }>(
+          '/pdf/full-extract',
           formData,
           { headers: { 'Content-Type': 'multipart/form-data' } }
         );
@@ -108,7 +111,7 @@ export function useExtraction() {
             filename: file.name,
             result: progressData?.result ?? null,
             status: progressData?.status === 'complete' ? 'complete' : 'failed',
-            error: progressData?.error,
+            error: progressData?.error ?? 'Extraction timed out or failed',
           };
           return updated;
         });

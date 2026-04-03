@@ -34,6 +34,20 @@ api.interceptors.response.use((response) => {
   return response;
 });
 
+// Handle 401 errors - redirect to login
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('api_token');
+      localStorage.removeItem('account_id');
+      localStorage.removeItem('user');
+      window.location.href = '/';
+    }
+    return Promise.reject(error);
+  }
+);
+
 // Document API
 export const documentApi = {
   getAll: async (params?: { status?: string; document_type?: string; per_page?: number }) => {

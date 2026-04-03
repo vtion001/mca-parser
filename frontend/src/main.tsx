@@ -54,11 +54,11 @@ function LoginScreen({ onLogin }: { onLogin: (user: User) => void }) {
       <div className="hidden lg:flex lg:w-1/2 bg-bw-50 flex-col items-center justify-center p-12">
         <div className="max-w-md text-center">
           <img
-            src="https://res.cloudinary.com/dbviya1rj/image/upload/v1775062877/gm3qwskgtgktqezpjmoo.png"
-            alt="Doc Scrappy Logo"
-            className="w-48 h-48 object-contain mx-auto mb-8"
-          />
-          <h1 className="text-3xl font-bold text-bw-900 mb-4">Doc Scrappy</h1>
+            src="https://res.cloudinary.com/dbviya1rj/image/upload/q_auto/f_auto/v1775139333/kmdolpscb6piob3qslgt.png"
+            alt="Dave Logo"
+            className="w-120 h-120 object-contain mx-auto mb-4"
+          />  
+          <h1 className="text-3xl font-bold text-bw-900 mb-4">Dave</h1>
           <p className="text-bw-500 text-lg leading-relaxed">
             Secure document processing and analysis powered by advanced AI technology.
             Extract, analyze, and manage your documents with confidence.
@@ -105,11 +105,11 @@ function LoginScreen({ onLogin }: { onLogin: (user: User) => void }) {
         <div className="w-full max-w-sm">
           <div className="lg:hidden text-center mb-8">
             <img
-              src="https://res.cloudinary.com/dbviya1rj/image/upload/v1775062877/gm3qwskgtgktqezpjmoo.png"
-              alt="Doc Scrappy"
+              src="https://res.cloudinary.com/dbviya1rj/image/upload/q_auto/f_auto/v1775139333/kmdolpscb6piob3qslgt.png"
+              alt="Dave"
               className="w-20 h-20 object-contain mx-auto mb-4"
             />
-            <h1 className="text-xl font-bold text-bw-900">Doc Scrappy</h1>
+            <h1 className="text-xl font-bold text-bw-900">Dave</h1>
           </div>
           <div className="text-center mb-8">
             <h2 className="text-2xl font-bold text-bw-900">Welcome back</h2>
@@ -207,12 +207,12 @@ function App() {
         <header className="py-6 px-8 border-b border-bw-100 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <img
-              src="https://res.cloudinary.com/dbviya1rj/image/upload/v1775062877/gm3qwskgtgktqezpjmoo.png"
-              alt="Doc Scrappy Logo"
+              src="https://res.cloudinary.com/dbviya1rj/image/upload/q_auto/f_auto/v1775139333/kmdolpscb6piob3qslgt.png"
+              alt="Dave Logo"
               className="w-20 h-20 object-contain"
             />
             <div>
-              <p className="text-sm font-semibold text-bw-900">Doc Scrappy</p>
+              <p className="text-sm font-semibold text-bw-900">Dave</p>
               <p className="text-xs text-bw-400">Powered by Alliance Global Solutions</p>
             </div>
           </div>
@@ -273,7 +273,7 @@ function App() {
 
         <footer className="max-w-6xl mx-auto px-8 py-6 border-t border-bw-100">
           <p className="text-xs text-bw-400 text-center">
-            Doc Scrappy · Powered by Alliance Global Solutions
+            Dave · Powered by Alliance Global Solutions
           </p>
         </footer>
       </div>

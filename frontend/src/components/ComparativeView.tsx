@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../services/api';
 import { ComparisonSelector } from './comparison/ComparisonSelector';
 import { BalanceComparison } from './comparison/BalanceComparison';
 import { DeltaComparison } from './comparison/DeltaComparison';
@@ -51,7 +51,7 @@ export function ComparativeView() {
 
     setLoading(true);
     try {
-      const response = await axios.post('/api/v1/documents/compare', {
+      const response = await api.post('/documents/compare', {
         document_ids: selectedIds,
         type: compareType,
       });

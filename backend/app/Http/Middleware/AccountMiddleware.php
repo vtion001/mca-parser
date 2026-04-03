@@ -50,7 +50,7 @@ class AccountMiddleware
         }
 
         $account = Account::where('id', $accountId)
-            ->where('is_active', true)
+            ->where('is_active', 't')
             ->first();
 
         if (!$account) {

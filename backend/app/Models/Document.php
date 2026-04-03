@@ -22,6 +22,7 @@ class Document extends Model
         'recommendations',
         'balances',
         'ai_analysis',
+        'mca_findings',
         'page_count',
         'error',
     ];
@@ -33,6 +34,7 @@ class Document extends Model
         'recommendations' => 'array',
         'balances' => 'array',
         'ai_analysis' => 'array',
+        'mca_findings' => 'array',
         'page_count' => 'integer',
     ];
 

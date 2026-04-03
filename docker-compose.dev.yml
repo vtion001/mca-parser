@@ -12,8 +12,8 @@ services:
       - PHP_OPCACHE_ENABLE=0
       - PHP_OPCACHE_REVALIDATE_FREQ=0
       - DB_CONNECTION=pgsql
-      - DB_HOST=${SUPABASE_DB_HOST:-aws-1-ap-northeast-2.pooler.supabase.com}
-      - DB_PORT=${SUPABASE_DB_PORT:-6543}
+      - DB_HOST=${SUPABASE_DB_HOST:-aws-1-ap-northeast-2.supabase.co}
+      - DB_PORT=${SUPABASE_DB_PORT:-5432}
       - DB_DATABASE=postgres
       - DB_USERNAME=${SUPABASE_DB_USER:-postgres.jcstvjvfmwrtkrmdrbte}
       - DB_PASSWORD=${SUPABASE_DB_PASSWORD:?Supabase DB password required}
@@ -51,8 +51,8 @@ services:
       - APP_DEBUG=true
       - PHP_OPCACHE_ENABLE=0
       - DB_CONNECTION=pgsql
-      - DB_HOST=${SUPABASE_DB_HOST:-aws-1-ap-northeast-2.pooler.supabase.com}
-      - DB_PORT=${SUPABASE_DB_PORT:-6543}
+      - DB_HOST=${SUPABASE_DB_HOST:-aws-1-ap-northeast-2.supabase.co}
+      - DB_PORT=${SUPABASE_DB_PORT:-5432}
       - DB_DATABASE=postgres
       - DB_USERNAME=${SUPABASE_DB_USER:-postgres.jcstvjvfmwrtkrmdrbte}
       - DB_PASSWORD=${SUPABASE_DB_PASSWORD:?Supabase DB password required}
@@ -145,4 +145,6 @@ services:
 
 networks:
   mca-network:
+    name: mca_pdf_scrubber_dev_network
+    driver: bridge
     external: false

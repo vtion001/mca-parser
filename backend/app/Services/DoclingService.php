@@ -26,11 +26,29 @@ class DoclingService
                 return $response->json();
             }
 
-            Log::error('Docling service error: ' . $response->body());
+            $body = $response->body();
+            $statusCode = $response->status();
+            Log::error('Docling service error', [
+                'status' => $statusCode,
+                'body' => $body,
+            ]);
+
+            // Return the actual error from docling service if available
+            $errorData = json_decode($body, true);
+            $errorMsg = 'Failed to extract text from PDF';
+            if (!empty($errorData['detail'])) {
+                $errorMsg = 'Docling error: ' . $errorData['detail'];
+            } elseif (!empty($errorData['error'])) {
+                $errorMsg = 'Docling error: ' . $errorData['error'];
+            } elseif ($statusCode === 502) {
+                $errorMsg = 'Docling service unavailable (502) - all replicas may be down or restarting';
+            } elseif ($statusCode === 503) {
+                $errorMsg = 'Docling service unavailable (503) - service is overloaded';
+            }
 
             return [
                 'success' => false,
-                'error' => 'Failed to extract text from PDF',
+                'error' => $errorMsg,
             ];
         } catch (\Exception $e) {
             Log::error('Docling service exception: ' . $e->getMessage());

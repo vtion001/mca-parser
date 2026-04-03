@@ -1,11 +1,11 @@
 services:
   # Nginx reverse proxy - single entry point for all services
   nginx:
-    image: nginx:alpine
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.nginx
     ports:
       - "8000:80"
-    volumes:
-      - ./docker/nginx.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
       - frontend
       - laravel
@@ -133,7 +133,7 @@ services:
       - mca-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://localhost:8001/health || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://localhost:8001/health || exit 1"]
       interval: 15s
       timeout: 10s
       retries: 3
@@ -141,7 +141,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 2G
+          memory: 4G
 
   docling-2:
     build:
@@ -153,7 +153,7 @@ services:
       - mca-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://localhost:8001/health || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://localhost:8001/health || exit 1"]
       interval: 15s
       timeout: 10s
       retries: 3
@@ -161,7 +161,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 2G
+          memory: 4G
 
   docling-3:
     build:
@@ -173,7 +173,7 @@ services:
       - mca-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://localhost:8001/health || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://localhost:8001/health || exit 1"]
       interval: 15s
       timeout: 10s
       retries: 3
@@ -181,7 +181,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 2G
+          memory: 4G
 
   docling-4:
     build:
@@ -193,7 +193,7 @@ services:
       - mca-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://localhost:8001/health || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://localhost:8001/health || exit 1"]
       interval: 15s
       timeout: 10s
       retries: 3
@@ -201,7 +201,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 2G
+          memory: 4G
 
   docling-5:
     build:
@@ -213,7 +213,7 @@ services:
       - mca-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://localhost:8001/health || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://localhost:8001/health || exit 1"]
       interval: 15s
       timeout: 10s
       retries: 3
@@ -221,7 +221,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 2G
+          memory: 4G
 
   # Redis for caching and queues
   redis:

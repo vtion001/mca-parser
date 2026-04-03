@@ -55,9 +55,9 @@ export function isValidRow(doc: any): boolean {
   const credits = txn?.total_amount_credits ?? null;
   const debits = txn?.total_amount_debits ?? null;
 
-  // Reject rows where both credits and debits are zero or negative (AI hallucination)
-  // Single-sided zero/negative (e.g., credits=0, debits>0) can be legitimate
-  if (credits !== null && credits <= 0 && debits !== null && debits <= 0) return false;
+  // Reject rows where both credits and debits are negative (AI hallucination)
+  // Both zero or single-sided zero/negative (e.g., credits=0, debits>0) can be legitimate for dormant accounts
+  if (credits !== null && debits !== null && credits < 0 && debits < 0) return false;
   // Reject rows where AI returned absurdly large numbers (likely hallucination)
   // Normal business bank accounts rarely exceed $10M in a month
   if (credits !== null && credits > 10_000_000) return false;

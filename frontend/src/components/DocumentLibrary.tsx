@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../services/api';
 import { DocumentFilters } from './library/DocumentFilters';
 import { DocumentList } from './library/DocumentList';
 
@@ -49,7 +49,7 @@ export function DocumentLibrary({
       if (filter !== 'all') params.append('status', filter);
       if (search) params.append('search', search);
 
-      const response = await axios.get(`/api/v1/documents?${params.toString()}`);
+      const response = await api.get(`/documents?${params.toString()}`);
       setDocuments(response.data.data || response.data);
     } catch (error) {
       console.error('Failed to fetch documents:', error);
@@ -63,7 +63,7 @@ export function DocumentLibrary({
     e.stopPropagation();
     if (!confirm('Delete this document?')) return;
     try {
-      await axios.delete(`/api/v1/documents/${id}`);
+      await api.delete(`/documents/${id}`);
       setDocuments(prev => prev.filter(d => d.id !== id));
     } catch (error) {
       console.error('Failed to delete:', error);
