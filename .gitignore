@@ -1,7 +1,64 @@
+# Environment
 .env
+.env.*
 backend/.env
+backend/.env.*
+frontend/.env
+frontend/.env.*
 
-# Orphaned/debug files
+# Python virtual environments
+.venv/
+python-service/.venv/
+.env/
+
+# Node modules
+frontend/node_modules/
+
+# PHP dependencies
+backend/vendor/
+backend/composer.lock
+
+# Laravel storage (runtime-generated)
+backend/storage/app/pdfs/
+backend/storage/framework/cache/
+backend/storage/framework/views/
+backend/storage/logs/
+backend/bootstrap/cache/
+backend/bootstrap/providers.php.bak
+
+# SQLite databases
+backend/database/*.sqlite
+backend/database/*.sqlite3
+
+# PHPUnit cache
+backend/.phpunit.cache/
+
+# Frontend build
+frontend/dist/
+frontend/.DS_Store
+
+# Python cache
+__pycache__/
+*.py[cod]
+python-service/src/__pycache__/
+.pytest_cache/
+
+# IDE / OS
+.DS_Store
+Thumbs.db
+desktop/
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Debug files
 backend/mca.txt
 frontend/profile-*.js
-desktop/
+
+# Docker volumes (persistent data)
+docker/volumes/
+
+# Logs
+*.log
+npm-debug.log*
