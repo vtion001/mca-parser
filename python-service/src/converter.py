@@ -37,9 +37,13 @@ def _convert_docling(tmp_path: str) -> tuple[str, int]:
     Returns (markdown_text, page_count).
     """
     global converter
-    result = converter.convert(tmp_path)
-    doc = result.document
-    text = doc.export_to_markdown()
-    page_count = len(result.pages) if result.pages else 1
+    try:
+        result = converter.convert(tmp_path)
+        doc = result.document
+        text = doc.export_to_markdown()
+        page_count = len(result.pages) if result.pages else 1
 
-    return text, page_count
+        return text, page_count
+    except MemoryError as e:
+        print(f"MemoryError during docling conversion of {tmp_path}: {e}")
+        raise Exception(f"Out of memory during PDF conversion. The document may be too large or have too many images.") from e

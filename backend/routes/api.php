@@ -20,12 +20,14 @@ Route::prefix('v1')->group(function () {
 
     // All API endpoints require auth via Bearer token
     Route::middleware('auth.api')->group(function () {
-        // PDF endpoints
-        Route::post('/pdf/upload', [PdfController::class, 'upload']);
-        Route::post('/pdf/analyze', [PdfController::class, 'analyze']);
-        Route::post('/pdf/scrub', [PdfController::class, 'scrub']);
-        Route::post('/pdf/full-extract', [ExtractionController::class, 'fullExtract']);
-        Route::get('/pdf/progress/{jobId}', [ExtractionController::class, 'progress']);
+        // PDF endpoints — account-isolated
+        Route::middleware('account')->group(function () {
+            Route::post('/pdf/upload', [PdfController::class, 'upload']);
+            Route::post('/pdf/analyze', [PdfController::class, 'analyze']);
+            Route::post('/pdf/scrub', [PdfController::class, 'scrub']);
+            Route::post('/pdf/full-extract', [ExtractionController::class, 'fullExtract']);
+            Route::get('/pdf/progress/{jobId}', [ExtractionController::class, 'progress']);
+        });
 
         // Auth management
         Route::post('/auth/logout', [AuthController::class, 'logout']);

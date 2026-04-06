@@ -74,10 +74,18 @@ class HealthController extends BaseController
     {
         try {
             DB::connection()->getPdo();
-            $version = DB::selectOne('SELECT VERSION() as version')->version ?? 'unknown';
+            $driver = DB::connection()->getDriverName();
+
+            // SQLite doesn't have VERSION(), use sqlite_version() or just confirm connection
+            if ($driver === 'sqlite') {
+                $version = DB::selectOne('SELECT sqlite_version() as version')->version ?? 'unknown';
+            } else {
+                $version = DB::selectOne('SELECT VERSION() as version')->version ?? 'unknown';
+            }
 
             return [
                 'healthy' => true,
+                'driver' => $driver,
                 'version' => $version,
             ];
         } catch (\Exception $e) {

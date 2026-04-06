@@ -167,16 +167,23 @@ async def extract_pdf(file: UploadFile = File(...)) -> models.ExtractResponse:
         PDF_PAGE_COUNT.observe(page_count)
 
         # Smart OCR: extract images with fitz and only run OCR if images were found
+        # Memory protection: skip OCR for large multi-page PDFs (>20 pages with images)
+        # to prevent OOM kills that cause 502 errors from docling worker crashes
         ocr_text = ""
         if ocr_mod.ocr_reader:
             images = await asyncio.to_thread(ocr_mod._extract_images, tmp_path)
             if images:
-                try:
-                    ocr_text = await asyncio.to_thread(ocr_mod._ocr_images_sync, tmp_path)
-                    OCR_COUNT.labels(status='success').inc()
-                except Exception as e:
-                    print(f"OCR failed for {tmp_path}: {e}")
-                    OCR_COUNT.labels(status='failure').inc()
+                print(f"PDF has {len(images)} images across {page_count} pages")
+                if page_count > 20 and len(images) > 0:
+                    print(f"Skipping OCR for large PDF ({page_count} pages, {len(images)} images) to prevent OOM")
+                    OCR_COUNT.labels(status='skipped_large').inc()
+                else:
+                    try:
+                        ocr_text = await asyncio.to_thread(ocr_mod._ocr_images_sync, tmp_path)
+                        OCR_COUNT.labels(status='success').inc()
+                    except Exception as e:
+                        print(f"OCR failed for {tmp_path}: {e}")
+                        OCR_COUNT.labels(status='failure').inc()
             else:
                 OCR_COUNT.labels(status='skipped').inc()
         else:

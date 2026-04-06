@@ -14,7 +14,12 @@ Browser → nginx:8000 → React (frontend) or Laravel (API)
                       → Supabase PostgreSQL/Redis (data/cache)
 ```
 
-**In Docker:** nginx reverse proxy on port 8000 routes to frontend, Laravel API, and Docling service.
+**In Docker:** nginx reverse proxy on port 8000 routes to frontend, Laravel API, and Docling service. The `frontend` container has no direct port exposure — it's served exclusively through nginx.
+
+**Service Discovery (Docker):**
+- nginx → `frontend:80`, `laravel:9000`, `docling-lb:8001`
+- docling-lb (nginx) → `docling-1:8001` through `docling-5:8001` (load-balanced)
+- laravel-worker connects to `redis:6379` for queue processing
 
 **Data Flow:**
 1. User uploads PDF via React frontend
@@ -25,7 +30,8 @@ Browser → nginx:8000 → React (frontend) or Laravel (API)
 
 ## Tech Stack
 
-- **Frontend:** React 18 + TypeScript + Tailwind CSS (app name: "Dave")
+- **Frontend:** React 18 + TypeScript + Tailwind CSS + Vite (app name: "Dave")
+- **Frontend (Docker):** Served by nginx, not directly accessible on a separate port
 - **Backend:** Laravel 11 (PHP 8.2+) + SQLite (local) / Supabase PostgreSQL (production) + Redis
 - **PDF Extraction:** Python Docling service (FastAPI + docling library + EasyOCR)
 - **AI Analysis:** OpenRouterService (extends BaseAIService) using OpenAI GPT-3.5 Turbo by default (configurable via `OPENROUTER_MODEL`)
@@ -34,8 +40,12 @@ Browser → nginx:8000 → React (frontend) or Laravel (API)
 
 ### Development
 ```bash
-# Full stack with Docker
+# Production-like stack with Docker (all services via nginx on :8000)
 docker-compose up --build
+
+# Development stack with hot-reload (uses docker-compose.dev.yml)
+docker-compose -f docker-compose.yml -f docker-compose.dev.yml up --build --profile dev
+# Services: nginx-dev:8000, laravel-dev:9000, frontend-dev:4200, docling-watcher
 
 # Full stack with monitoring (Prometheus + Grafana)
 docker-compose -f docker-compose.yml -f docker-compose.monitoring.yml up --build
@@ -48,11 +58,13 @@ docker-compose up -d
 docker-compose build frontend
 docker-compose up -d
 
-# Individual services
-cd frontend && npm run dev      # React on :5173
+# Individual services (for hot-reload development)
+cd frontend && npm run dev      # React on :5173 (proxies to nginx:8000)
 cd backend && php artisan serve # Laravel on :8000
 cd python-service && python src/server.py  # Docling on :8001
 ```
+
+**Docker networking note:** In Docker, nginx handles routing so all services are accessed via `http://localhost:8000`. Running `npm run dev` directly gives you Vite's hot module replacement on `:5173`.
 
 ### Backend (Laravel/PHP)
 ```bash
@@ -130,9 +142,9 @@ All routes prefixed with `/api/v1`:
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/health` | Basic health check |
-| GET | `/health/ready` | Readiness check |
-| GET | `/health/docling` | Docling service health |
+| GET | `/health` | Basic health check (nginx) |
+| GET | `/health/ready` | Readiness check (Laravel + Redis) |
+| GET | `/health/docling` | Docling service health (via docling-lb) |
 | POST | `/auth/register` | Register new user (public) |
 | POST | `/auth/login` | Login, returns Bearer token (public) |
 | POST | `/auth/logout` | Revoke Bearer token (auth required) |
@@ -177,8 +189,8 @@ User authentication via Bearer token (`api_token`) + account ownership validatio
 
 | Component | Replicas | Workers | Purpose |
 |-----------|----------|---------|---------|
-| Laravel Workers | --scale | 10/pod | Queue job processing |
-| Docling Service | 5 | - | PDF text extraction via load balancer |
+| Laravel Workers | 1 (supervisord) | 10 per pod | Queue job processing via supervisord |
+| Docling Service | 5 named containers | - | PDF text extraction via docling-lb nginx |
 | Redis | 1 | - | Cache + Queue |
 | Supabase PostgreSQL | 1 | - | Persistent storage |
 
@@ -201,6 +213,16 @@ Required environment variables for Docker Compose (set in `.env` or shell):
 1. Run `/code-review:code-review` to check production readiness
 2. Fix any issues flagged with confidence >= 75
 3. Update this CLAUDE.md if new patterns, services, or architecture are introduced
+
+### Code Review Focus Areas
+
+When reviewing code, prioritize these concerns:
+
+1. **PII Data Handling** - Sensitive data (SSN, credit cards, emails, phones) must be masked in logs, errors, and responses. Never expose extracted text to client unless authorized.
+2. **ReDoS Prevention** - Regex patterns for PII detection must not allow catastrophic backtracking. Anchor patterns with specific character classes.
+3. **API Contract Integrity** - Verify frontend/backend and backend/Python service interfaces match. All endpoints use `/api/v1/` prefix.
+4. **Service Failure Grace** - Docling unavailability should return meaningful errors, not propagate internal failures.
+5. **File Lifecycle** - PDF uploads and temp files must be cleaned up even on error paths.
 
 ### Deployment
 
@@ -242,6 +264,6 @@ Before deploying, verify:
 
 ## Known Limitations
 
-1. **Scaling workers**: Use `docker-compose up -d --scale laravel-worker=10` for standalone Docker Compose. For Swarm, use `docker stack deploy`.
+1. **Laravel worker scaling**: The `laravel-worker` service uses supervisord to manage 10 queue worker processes within a single container. Scaling requires rebuilding with modified supervisord configuration.
 
-2. **Docling replicas**: 5 named containers (docling-1 through docling-5) replace the `--scale` approach due to shared volume requirements.
+2. **Docling replicas**: 5 named containers (docling-1 through docling-5) replace the `--scale` approach due to shared volume requirements. The docling-lb nginx load balancer distributes traffic across them.

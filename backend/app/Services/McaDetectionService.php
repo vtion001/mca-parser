@@ -432,6 +432,15 @@ class McaDetectionService
                 continue;
             }
 
+            // Handle markdown table rows (lines containing | separators)
+            if ($this->isTableRow($line)) {
+                $tableTxn = $this->extractTableRowTransaction($line);
+                if ($tableTxn) {
+                    $transactions[] = $tableTxn;
+                    continue;
+                }
+            }
+
             // Extract amount if present
             $amount = $this->extractAmount($line);
 
@@ -453,6 +462,101 @@ class McaDetectionService
         }
 
         return $transactions;
+    }
+
+    /**
+     * Check if a line is a markdown table row
+     */
+    private function isTableRow(string $line): bool
+    {
+        // Table rows contain | separators and are not header/separator rows
+        if (strpos($line, '|') === false) {
+            return false;
+        }
+        // Skip markdown table separator rows like |---|---|---|
+        if (preg_match('/^\s*\|[\s\-:|]+\|\s*$/', $line)) {
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Extract transaction from a markdown table row
+     */
+    private function extractTableRowTransaction(string $line): ?array
+    {
+        // Split by | and filter empty parts
+        $cells = array_filter(array_map('trim', explode('|', $line)), fn($c) => $c !== '');
+        $cells = array_values($cells);
+
+        if (count($cells) < 2) {
+            return null;
+        }
+
+        // Try to identify which cell is date, description, and amount
+        $date = null;
+        $description = null;
+        $amount = null;
+
+        foreach ($cells as $i => $cell) {
+            // Check if this cell looks like a date
+            $cellDate = $this->extractDate($cell);
+            if ($cellDate && $date === null) {
+                $date = $cellDate;
+                continue;
+            }
+
+            // Check if this cell looks like an amount
+            $cellAmount = $this->extractAmount($cell);
+            if ($cellAmount !== null && $amount === null) {
+                $amount = $cellAmount;
+                continue;
+            }
+        }
+
+        // Description is typically the non-date, non-amount cell
+        // Try to find a meaningful description cell
+        foreach ($cells as $i => $cell) {
+            $cellTrimmed = trim($cell);
+            // Skip if it's just a date or amount
+            if ($cellTrimmed === $date) continue;
+            if ($cellTrimmed === (string)$amount) continue;
+
+            // Skip very short or numeric-only cells
+            if (strlen($cellTrimmed) < 3) continue;
+            if (is_numeric(preg_replace('/[,\$\-\s]/', '', $cellTrimmed))) continue;
+
+            // Skip cells that look like balance labels
+            if (preg_match('/(balance|total|subtotal|opening|closing)/i', $cellTrimmed)) {
+                continue;
+            }
+
+            // This looks like a description
+            if ($description === null) {
+                $description = $cellTrimmed;
+            }
+        }
+
+        if ($description === null && count($cells) >= 2) {
+            // Fallback: use the last non-date cell as description
+            foreach (array_reverse($cells) as $cell) {
+                $cellTrimmed = trim($cell);
+                if ($cellTrimmed !== $date && strlen($cellTrimmed) > 3) {
+                    $description = $cellTrimmed;
+                    break;
+                }
+            }
+        }
+
+        if ($description && (strlen($description) > 3 && strlen($description) < 200)) {
+            return [
+                'description' => $description,
+                'amount' => $amount,
+                'date' => $date,
+            ];
+        }
+
+        return null;
     }
 
     /**

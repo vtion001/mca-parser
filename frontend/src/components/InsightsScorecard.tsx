@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import type { ExtractionResult } from '../types/extraction';
 import type { TransactionRow } from '../types/transactions';
 import { getTagColor } from '../utils/transactionParser';
@@ -6,6 +6,8 @@ import { fmtMoney } from './statements/utils';
 import { useInsightsCalculations } from '../hooks/useInsightsCalculations';
 import { DataTable } from './tables/DataTable';
 import { MiniLineChart } from './charts/MiniLineChart';
+import { exportData, buildTrueBalances, downloadCsv, type ExportType } from '../utils/csvExport';
+import { EXPORT_OPTIONS } from '../types/export';
 
 // ─── Sub-components ────────────────────────────────────────────────────────────
 
@@ -67,6 +69,49 @@ export function InsightsScorecard({ result }: InsightsScorecardProps) {
 
   const confidence = Math.round((result.scores?.overall ?? result.document_type?.confidence ?? 0.85) * 100);
 
+  // Export dropdown state
+  const [exportOpen, setExportOpen] = useState(false);
+
+  // Calculate true balances for export
+  const trueBalances = useMemo(() => {
+    return buildTrueBalances(transactions, begBal);
+  }, [transactions, begBal]);
+
+  // Close dropdown when clicking outside
+  const exportRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (exportRef.current && !exportRef.current.contains(event.target as Node)) {
+        setExportOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Handle export
+  const handleExport = useCallback((type: ExportType, filename: string) => {
+    try {
+      const csvContent = exportData(type, {
+        transactions,
+        dailyBalances,
+        trueBalances,
+        begBal,
+        endBal,
+        accountName: 'Account',
+        bankName: 'Bank of America',
+        statementPeriod: 'Statement Period',
+        mcaPaymentsByMonth,
+        revenueStats,
+      });
+      downloadCsv(csvContent, filename);
+    } catch (err) {
+      console.error('Export failed:', err);
+    } finally {
+      setExportOpen(false);
+    }
+  }, [transactions, dailyBalances, trueBalances, begBal, endBal, mcaPaymentsByMonth, revenueStats]);
+
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     revenue: true,
     balance: true,
@@ -94,7 +139,38 @@ export function InsightsScorecard({ result }: InsightsScorecardProps) {
             {result.markdown ? 'Account' : 'Account'} · {'Statement Period'}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
+          {/* Export Dropdown */}
+          <div className="relative" ref={exportRef}>
+            <button
+              onClick={() => setExportOpen(!exportOpen)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-bw-700 hover:bg-bw-600 text-white text-[10px] font-semibold uppercase tracking-wider rounded transition-colors"
+            >
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              Export CSV
+              <svg className={`w-2.5 h-2.5 transition-transform ${exportOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            {exportOpen && (
+              <div className="absolute right-0 mt-1 w-64 bg-white rounded-lg shadow-xl border border-bw-200 z-50 max-h-96 overflow-y-auto">
+                <div className="py-1">
+                  {EXPORT_OPTIONS.map((option) => (
+                    <button
+                      key={option.type}
+                      onClick={() => handleExport(option.type, option.filename)}
+                      className="w-full px-4 py-2 text-left hover:bg-bw-50 transition-colors"
+                    >
+                      <div className="text-[11px] font-semibold text-bw-800">{option.label}</div>
+                      <div className="text-[9px] text-bw-400 mt-0.5">{option.description}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
           <span className="text-[9px] text-bw-400 uppercase tracking-wider">Confidence</span>
           <span className={`text-sm font-bold ${confidence >= 90 ? 'text-green-400' : confidence >= 75 ? 'text-yellow-400' : 'text-red-400'}`}>
             {confidence}%

@@ -27,7 +27,7 @@ class ProcessPdfExtraction implements ShouldQueue
 
     public int $tries = 5;
     public int $backoff = 60; // seconds between retries (exponential: 60, 120, 240...)
-    public int $timeout = 300;
+    public int $timeout = 900;
 
     private string $jobId;
     private string $filePath;

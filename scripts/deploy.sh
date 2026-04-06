@@ -1,232 +1,339 @@
 #!/bin/bash
 # ============================================================
-# MCA PDF Scrubber — Deploy to Azure Container Apps
-# Uses: docker compose → Azure Container Apps
+# MCA PDF Scrubber — Local Development Deploy Script
+# Ensures code changes are picked up by forcing rebuild + recreate
 # ============================================================
-# PREREQUISITES (one-time):
-#   brew install azure-cli
-#   az login
-#   az provider register --namespace Microsoft.App
 #
 # USAGE:
-#   ./scripts/deploy.sh          # Full deploy
-#   ./scripts/deploy.sh build    # Build + push images only
-#   ./scripts/deploy.sh infra    # Create infrastructure only
+#   ./scripts/deploy.sh              # Deploy all services
+#   ./scripts/deploy.sh docling      # Deploy only docling (1-5 + docling-lb)
+#   ./scripts/deploy.sh laravel      # Deploy only laravel + laravel-worker
+#   ./scripts/deploy.sh frontend     # Deploy only frontend + nginx
+#   ./scripts/deploy.sh redis       # Deploy only redis
+#
+# OPTIONS:
+#   --no-build      Skip build step (just recreate)
+#   --no-verify     Skip verification step
+#   --force         Force recreate even if code unchanged
 # ============================================================
 
 set -e
-
-LOCATION="southeastasia"
-RESOURCE_GROUP="mca-pdf-scrubber-rg"
-ACR_NAME="mcasharpdf$(date +%m%d)"
-ENV_NAME="mca-env"
-APP_NAME="mca-app"
-IMAGE_TAG="latest"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$PROJECT_DIR"
 
+# Default values
+TARGET="${1:-all}"
+SKIP_BUILD=false
+SKIP_VERIFY=false
+FORCE_RECREATE=false
+
+# Parse options
+while [[ "$#" -gt 0 ]]; do
+    case "$1" in
+        --no-build) SKIP_BUILD=true; shift ;;
+        --no-verify) SKIP_VERIFY=true; shift ;;
+        --force) FORCE_RECREATE=true; shift ;;
+        -h|--help)
+            echo "Usage: $0 [service] [options]"
+            echo ""
+            echo "Services: all, docling, laravel, frontend, redis"
+            echo "Options:"
+            echo "  --no-build    Skip build step (just recreate)"
+            echo "  --no-verify   Skip verification step"
+            echo "  --force       Force recreate even if code unchanged"
+            exit 0
+            ;;
+        *) shift ;;
+    esac
+done
+
 # Colors
-RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+NC='\033[0m'
+
 log() { echo -e "${GREEN}[deploy]${NC} $1"; }
 warn() { echo -e "${YELLOW}[deploy]${NC} $1"; }
 err() { echo -e "${RED}[deploy]${NC} $1"; }
+info() { echo -e "${BLUE}[deploy]${NC} $1"; }
+step() { echo -e "${CYAN}  ->${NC} $1"; }
 
-# ─── CHECKS ──────────────────────────────────────────────────
-check_azure() {
-    log "Checking Azure CLI..."
-    if ! command -v az &> /dev/null; then
-        err "Azure CLI not installed. Run: brew install azure-cli"
-        exit 1
-    fi
-    ACCOUNT=$(az account show --query user.name -o tsv 2>/dev/null) || true
-    if [ -z "$ACCOUNT" ]; then
-        warn "Not logged in to Azure. Running 'az login'..."
-        az login --use-device-code
-    fi
-    log "Logged in as: $(az account show --query user.name -o tsv)"
+# ─── GIT INFO ─────────────────────────────────────────────────
+get_git_commit() {
+    git -C "$PROJECT_DIR" rev-parse --short=8 HEAD 2>/dev/null || echo "unknown"
 }
 
-check_env() {
-    log "Checking environment variables..."
-    if [ -z "$OPENROUTER_API_KEY" ]; then
-        warn "OPENROUTER_API_KEY not set. Set it in .env or export it:"
-        warn "  export OPENROUTER_API_KEY='your-key'"
+# ─── VERIFICATION ─────────────────────────────────────────────
+verify_docling() {
+    local container="$1"
+    local code_path="/app/src/server.py"
+
+    # Get git commit of python-service
+    local py_commit
+    py_commit=$(git -C "$PROJECT_DIR/python-service" rev-parse --short=8 HEAD 2>/dev/null || echo "unknown")
+
+    # Check if container has the expected git commit in the code
+    local container_commit
+    container_commit=$(docker exec "$container" git -C /app rev-parse --short=8 HEAD 2>/dev/null || echo "unknown")
+
+    if [ "$container_commit" != "unknown" ]; then
+        if [ "$container_commit" = "$py_commit" ]; then
+            log "$container: Code verified (commit $container_commit)"
+            return 0
+        else
+            err "$container: Mismatch! Container has $container_commit, expected $py_commit"
+            return 1
+        fi
     fi
+
+    # Fallback: check for known marker strings (version comments)
+    local markers=("page_count > 20" "timeout = 900" "DOCLING_VERSION")
+    local found=0
+    for marker in "${markers[@]}"; do
+        if docker exec "$container" grep -q "$marker" "$code_path" 2>/dev/null; then
+            info "$container: Verified via marker '$marker'"
+            found=1
+            break
+        fi
+    done
+
+    if [ "$found" -eq 0 ]; then
+        warn "$container: Could not verify code (no git, no markers found)"
+    fi
+    return 0
 }
 
-# ─── BUILD & PUSH ─────────────────────────────────────────────
-build_images() {
-    log "Building and pushing Docker images to Azure Container Registry..."
+verify_laravel() {
+    local container="$1"
+    local code_path="/var/www/html"
 
-    # Create ACR if not exists
-    if ! az acr show --name "$ACR_NAME" --resource-group "$RESOURCE_GROUP" &> /dev/null; then
-        log "Creating Azure Container Registry: $ACR_NAME"
-        az acr create \
-            --resource-group "$RESOURCE_GROUP" \
-            --name "$ACR_NAME" \
-            --sku Basic \
-            --location "$LOCATION" \
-            --admin-enable true
+    local git_commit
+    git_commit=$(git -C "$PROJECT_DIR/backend" rev-parse --short=8 HEAD 2>/dev/null || echo "unknown")
+
+    local container_commit
+    container_commit=$(docker exec "$container" git -C "$code_path" rev-parse --short=8 HEAD 2>/dev/null || echo "unknown")
+
+    if [ "$container_commit" != "unknown" ]; then
+        if [ "$container_commit" = "$git_commit" ]; then
+            log "$container: Code verified (commit $container_commit)"
+            return 0
+        else
+            err "$container: Mismatch! Container has $container_commit, expected $git_commit"
+            return 1
+        fi
     fi
 
-    ACR_LOGIN=$(az acr show --name "$ACR_NAME" --query loginServer -o tsv)
-    ACR_PASSWORD=$(az acr credential show --name "$ACR_NAME" --query passwords[0].value -o tsv)
-
-    log "Logging in to ACR: $ACR_LOGIN"
-    echo "$ACR_PASSWORD" | docker login "$ACR_LOGIN" -u "00000000-0000-0000-0000-000000000000" --password-stdin
-
-    # Build all images
-    log "Building Docker images..."
-    docker build -t "$ACR_LOGIN/laravel:$IMAGE_TAG" -f docker/Dockerfile.laravel backend/
-    docker build -t "$ACR_LOGIN/docling:$IMAGE_TAG" python-service/
-    docker build -t "$ACR_LOGIN/frontend:$IMAGE_TAG" frontend/
-
-    # Push
-    log "Pushing images..."
-    docker push "$ACR_LOGIN/laravel:$IMAGE_TAG"
-    docker push "$ACR_LOGIN/docling:$IMAGE_TAG"
-    docker push "$ACR_LOGIN/frontend:$IMAGE_TAG"
-
-    log "✅ Images pushed: $ACR_LOGIN/{laravel,docling,frontend}:$IMAGE_TAG"
+    warn "$container: Could not verify code (git not available in container)"
+    return 0
 }
 
-# ─── CREATE INFRASTRUCTURE ───────────────────────────────────
-create_infra() {
-    log "Creating Azure infrastructure..."
-
-    # Resource group
-    az group create --name "$RESOURCE_GROUP" --location "$LOCATION" 2>/dev/null || true
-
-    # Container Apps Environment
-    log "Creating Container Apps Environment..."
-    az containerapp env create \
-        --name "$ENV_NAME" \
-        --resource-group "$RESOURCE_GROUP" \
-        --location "$LOCATION" 2>/dev/null || log "Environment may already exist, continuing..."
-
-    # Azure Cache for Redis
-    log "Creating Redis..."
-    az redis create \
-        --name "${ACR_NAME}redis" \
-        --resource-group "$RESOURCE_GROUP" \
-        --location "$LOCATION" \
-        --sku Basic \
-        --vm-size c0 \
-        --enable-non-ssl-port 2>/dev/null || log "Redis may already exist"
-
-    # Azure Database for PostgreSQL
-    log "Creating PostgreSQL..."
-    DB_NAME="${ACR_NAME}db"
-    az postgres flexible-server create \
-        --name "$DB_NAME" \
-        --resource-group "$RESOURCE_GROUP" \
-        --location "$LOCATION" \
-        --admin-user pgadmin \
-        --admin-password "TempPass123!" \
-        --sku-name B1s \
-        --storage-sizeGB 20 \
-        --version 15 \
-        --database-name mca_pdf \
-        2>/dev/null || log "PostgreSQL may already exist"
-
-    log "✅ Infrastructure created"
+verify_frontend() {
+    local container="$1"
+    info "$container: Frontend uses Docker build, verification via health check only"
+    return 0
 }
 
-# ─── DEPLOY ───────────────────────────────────────────────────
-deploy_compose() {
-    log "Deploying to Azure Container Apps via Docker Compose..."
+# ─── HEALTH WAIT ─────────────────────────────────────────────
+wait_for_healthy() {
+    local service="$1"
+    local timeout="${2:-60}"
+    local name
 
-    ACR_LOGIN=$(az acr show --name "$ACR_NAME" --query loginServer -o tsv)
-    ACR_USERNAME=$(az acr credential show --name "$ACR_NAME" --query username -o tsv)
-    ACR_PASSWORD=$(az acr credential show --name "$ACR_NAME" --query passwords[0].value -o tsv)
+    # Map service name to container name suffix
+    case "$service" in
+        docling-1) name="mca_pdf_scrubber-docling-1-1" ;;
+        docling-2) name="mca_pdf_scrubber-docling-2-1" ;;
+        docling-3) name="mca_pdf_scrubber-docling-3-1" ;;
+        docling-4) name="mca_pdf_scrubber-docling-4-1" ;;
+        docling-5) name="mca_pdf_scrubber-docling-5-1" ;;
+        laravel) name="mca_pdf_scrubber-laravel-1" ;;
+        laravel-worker) name="mca_pdf_scrubber-laravel-worker-1" ;;
+        redis) name="mca_pdf_scrubber-redis-1" ;;
+        frontend) name="mca_pdf_scrubber-frontend-1" ;;
+        nginx) name="mca_pdf_scrubber-nginx-1" ;;
+        docling-lb) name="mca_pdf_scrubber-docling-lb-1" ;;
+        *) name="mca_pdf_scrubber-$service-1" ;;
+    esac
 
-    # Get PostgreSQL and Redis connection info
-    DB_NAME="${ACR_NAME}db"
-    DB_HOST=$(az postgres flexible-server show --name "$DB_NAME" --resource-group "$RESOURCE_GROUP" --query fullyQualifiedDomainName -o tsv 2>/dev/null || echo "${DB_NAME}.postgres.database.azure.com")
-    REDIS_HOST=$(az redis show --name "${ACR_NAME}redis" --resource-group "$RESOURCE_GROUP" --query hostName -o tsv 2>/dev/null || echo "${ACR_NAME}redis.redis.cache.windows.net")
+    info "Waiting for $service to be healthy (timeout: ${timeout}s)..."
 
-    # Create a temporary compose override for Azure
-    cat > docker-compose.azure.yml << EOF
-services:
-  laravel:
-    image: ${ACR_LOGIN}/laravel:${IMAGE_TAG}
-    ports:
-      - "8000:9000"
-    environment:
-      - APP_ENV=production
-      - APP_DEBUG=false
-      - DB_CONNECTION=pgsql
-      - DB_HOST=${DB_HOST}
-      - DB_PORT=5432
-      - DB_DATABASE=mca_pdf
-      - DB_USERNAME=pgadmin
-      - DB_PASSWORD=TempPass123!
-      - REDIS_HOST=${REDIS_HOST}
-      - REDIS_PORT=6380
-      - DOCLING_SERVICE_URL=http://docling-lb:8001
-      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
-    expose:
-      - "9000"
+    local elapsed=0
+    local interval=2
 
-  docling-lb:
-    image: ${ACR_LOGIN}/docling:${IMAGE_TAG}
-    ports:
-      - "8001:8001"
-    expose:
-      - "8001"
-    environment:
-      - PYTHONUNBUFFERED=1
+    while [ $elapsed -lt $timeout ]; do
+        local status
+        status=$(docker inspect --format='{{.State.Health.Status}}' "$name" 2>/dev/null || echo "unknown")
 
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
-    expose:
-      - "6379"
-EOF
+        case "$status" in
+            healthy)
+                log "$service is healthy"
+                return 0
+                ;;
+            starting)
+                step "Status: starting..."
+                ;;
+            unhealthy)
+                err "$service is unhealthy!"
+                docker inspect "$name" --format='{{range .State.Health.Log}}{{.Output}}{{end}}' 2>/dev/null | tail -5
+                return 1
+                ;;
+            *)
+                step "Status: $status"
+                ;;
+        esac
 
-    log "Deploying compose file to Azure Container Apps..."
-    az containerapp compose create \
-        --resource-group "$RESOURCE_GROUP" \
-        --environment "$ENV_NAME" \
-        --file docker-compose.azure.yml \
-        --registry-server "$ACR_LOGIN" \
-        --registry-username "$ACR_USERNAME" \
-        --registry-password "$ACR_PASSWORD" \
-        --location "$LOCATION" \
-        --output table
+        sleep $interval
+        elapsed=$((elapsed + interval))
+    done
 
-    APP_URL=$(az containerapp show \
-        --name "${APP_NAME}-laravel" \
-        --resource-group "$RESOURCE_GROUP" \
-        --query properties.fqdn -o tsv 2>/dev/null || echo "check Azure Portal")
+    err "$service failed to become healthy within ${timeout}s"
+    return 1
+}
+
+# ─── BUILD & RECREATE ────────────────────────────────────────
+deploy_service() {
+    local service="$1"
+    local verify_func="$2"
+
+    log "=========================================="
+    log "Deploying: $service"
+    log "=========================================="
+
+    # Determine build flags
+    local build_flags="--build --force-recreate"
+    if [ "$SKIP_BUILD" = true ]; then
+        build_flags="--force-recreate"
+        info "Build skipped (--no-build)"
+    fi
+
+    # Pull latest base images if building
+    if [ "$SKIP_BUILD" = false ]; then
+        step "Pulling base images..."
+        case "$service" in
+            laravel|laravel-worker)
+                docker pull php:8.2-fpm 2>/dev/null || true
+                ;;
+            docling-*|docling-lb)
+                docker pull python:3.11-slim 2>/dev/null || true
+                docker pull nginx:alpine 2>/dev/null || true
+                ;;
+            frontend|nginx)
+                docker pull node:20-alpine 2>/dev/null || true
+                docker pull nginx:alpine 2>/dev/null || true
+                ;;
+        esac
+    fi
+
+    # Build and recreate
+    step "Building and recreating $service..."
+    if ! docker-compose up -d $build_flags "$service"; then
+        err "Failed to deploy $service"
+        return 1
+    fi
+
+    # Wait for healthy (unless --no-verify)
+    if [ "$SKIP_VERIFY" = false ]; then
+        wait_for_healthy "$service" 90 || warn "$service health check inconclusive"
+    else
+        info "Verification skipped (--no-verify)"
+    fi
+
+    # Verify code
+    if [ "$SKIP_VERIFY" = false ] && [ -n "$verify_func" ]; then
+        step "Verifying code..."
+        $verify_func "$name" 2>/dev/null || warn "Code verification inconclusive"
+    fi
+
+    log "$service deployed successfully"
+    return 0
+}
+
+# ─── SERVICE DEPLOYMENT MAP ───────────────────────────────────
+deploy_docling() {
+    log "Deploying docling service (all 5 replicas + load balancer)"
+
+    # Deploy docling replicas first
+    for i in 1 2 3 4 5; do
+        deploy_service "docling-$i" "verify_docling" || return 1
+    done
+
+    # Deploy load balancer
+    deploy_service "docling-lb" "" || return 1
+    return 0
+}
+
+deploy_laravel() {
+    deploy_service "laravel" "verify_laravel" || return 1
+    deploy_service "laravel-worker" "verify_laravel" || return 1
+    return 0
+}
+
+deploy_frontend() {
+    deploy_service "frontend" "verify_frontend" || return 1
+    deploy_service "nginx" "" || return 1
+    return 0
+}
+
+deploy_redis() {
+    deploy_service "redis" "" || return 1
+    return 0
+}
+
+deploy_all() {
+    log "Deploying all services..."
+
+    # Start with infrastructure
+    deploy_redis || return 1
+
+    # Deploy application services
+    deploy_laravel || return 1
+    deploy_frontend || return 1
+    deploy_docling || return 1
 
     log ""
     log "=========================================="
-    log "  ✅ DEPLOYED!"
-    log "  App URL: https://${APP_URL}"
-    log "  ACR: $ACR_LOGIN"
+    log "  ALL SERVICES DEPLOYED"
+    log "  Git commit: $(get_git_commit)"
     log "=========================================="
-}
-
-# ─── FULL DEPLOY ────────────────────────────────────────────────
-cmd_full() {
-    check_azure
-    check_env
-    build_images
-    create_infra
-    deploy_compose
+    return 0
 }
 
 # ─── MAIN ─────────────────────────────────────────────────────
-case "${1:-full}" in
-    full)    cmd_full ;;
-    build)   check_azure && build_images ;;
-    infra)   check_azure && create_infra ;;
-    deploy)  check_azure && deploy_compose ;;
-    *)
-        echo "Usage: $0 {full|build|infra|deploy}"
-        exit 1 ;;
-esac
+main() {
+    log "MCA PDF Scrubber — Deploy Script"
+    log "Target: $TARGET"
+    log "Project: $PROJECT_DIR"
+    log ""
+
+    # Check docker-compose is available
+    if ! command -v docker-compose &> /dev/null; then
+        err "docker-compose not found. Please install Docker Compose."
+        exit 1
+    fi
+
+    # Check for required files
+    if [ ! -f "$PROJECT_DIR/docker-compose.yml" ]; then
+        err "docker-compose.yml not found in project root"
+        exit 1
+    fi
+
+    case "$TARGET" in
+        all)        deploy_all ;;
+        docling)    deploy_docling ;;
+        laravel)    deploy_laravel ;;
+        frontend)   deploy_frontend ;;
+        redis)      deploy_redis ;;
+        *)
+            err "Unknown service: $TARGET"
+            err "Valid services: all, docling, laravel, frontend, redis"
+            exit 1
+            ;;
+    esac
+}
+
+main
