@@ -56,6 +56,18 @@ desktop/
 backend/mca.txt
 frontend/profile-*.js
 
+# Local dev PID files
+.local-dev-*.pid
+
+# Playwright MCP test artifacts
+.playwright-mcp/
+
+# Supabase temp files
+supabase/.temp/
+
+# Alto dev state
+.claude/alto-dev/
+
 # Docker volumes (persistent data)
 docker/volumes/
 
