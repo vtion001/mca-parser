@@ -9,7 +9,8 @@ const api = axios.create({
   },
 });
 
-// Attach Bearer token and X-Account-ID from localStorage on every request
+// Attach Bearer token and X-Account-ID from localStorage on every request.
+// Also remove Content-Type for FormData so axios auto-sets multipart boundary.
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('api_token');
   const accountId = localStorage.getItem('account_id');
@@ -18,6 +19,10 @@ api.interceptors.request.use((config) => {
   }
   if (accountId) {
     config.headers['X-Account-ID'] = accountId;
+  }
+  // Let axios set Content-Type with boundary for FormData — don't override
+  if (config.data instanceof FormData) {
+    delete config.headers['Content-Type'];
   }
   return config;
 });
