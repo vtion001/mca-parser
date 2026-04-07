@@ -127,7 +127,18 @@ Requirements: Python 3.10+, PyTorch 2.0+, Docling 2.0+
 - **AuthMiddleware.php** - Bearer token authentication; validates `api_token` on every request
 
 ### Backend Jobs
-- **ProcessPdfExtraction.php** - Async job orchestrating full extraction pipeline: Docling → type detection → field mapping → PII detection → balance extraction → AI analysis. Uses Redis caching with stampede protection.
+- **ProcessPdfExtraction.php** - Async job orchestrating full extraction pipeline via `PdfExtractionPipeline`
+- **PdfExtractionPipeline.php** - Orchestrates 7 pipeline steps in sequence:
+  1. **DoclingExtractionStep** - Extract text from PDF via Python Docling service
+  2. **TypeDetectionStep** - Classify document type (bank statement, invoice, etc.)
+  3. **FieldMappingStep** - Map extracted fields based on document type
+  4. **ScoringStep** - Score extraction quality and reliability
+  5. **PiiDetectionStep** - Detect PII (SSN, credit cards, emails, phones) via `PdfAnalyzerService`
+  6. **BalanceExtractionStep** - Extract balance figures
+  7. **AiAnalysisStep** - AI-powered analysis via `OpenRouterService` and `McaAiService`
+  - **Post-processing** (not a pipeline step): MCA detection via `McaAiService` + transaction classification via `TransactionClassificationService`
+  - **Cache**: Stampede-protected MD5-file-hash cache with 7-day TTL
+- **PipelineContext.php** - Carries extraction state (markdown, documentType, keyDetails, balances, scores, piiBreakdown, aiAnalysis, mcaFindings, transactionClassification) through pipeline steps
 
 ### Python Service (python-service/src/)
 - **server.py** - FastAPI server with async thread-pool offloading
