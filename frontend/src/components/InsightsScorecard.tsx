@@ -93,15 +93,19 @@ export function InsightsScorecard({ result }: InsightsScorecardProps) {
   // Handle export
   const handleExport = useCallback((type: ExportType, filename: string) => {
     try {
+      const accountName = result.key_details.find(k => k.field === 'account_number')?.value ?? 'Account';
+      const bankName = result.key_details.find(k => k.field === 'bank_name')?.value ?? 'Bank';
+      const statementPeriod = result.key_details.find(k => k.field === 'statement_period')?.value ?? 'Period';
+
       const csvContent = exportData(type, {
         transactions,
         dailyBalances,
         trueBalances,
         begBal,
         endBal,
-        accountName: 'Account',
-        bankName: 'Bank of America',
-        statementPeriod: 'Statement Period',
+        accountName,
+        bankName,
+        statementPeriod,
         mcaPaymentsByMonth,
         revenueStats,
       });
@@ -111,7 +115,7 @@ export function InsightsScorecard({ result }: InsightsScorecardProps) {
     } finally {
       setExportOpen(false);
     }
-  }, [transactions, dailyBalances, trueBalances, begBal, endBal, mcaPaymentsByMonth, revenueStats]);
+  }, [result.key_details, transactions, dailyBalances, trueBalances, begBal, endBal, mcaPaymentsByMonth, revenueStats]);
 
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     revenue: true,

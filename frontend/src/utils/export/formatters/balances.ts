@@ -56,7 +56,7 @@ export function exportMonthlyCashFlows(
 export function exportMonthlyMca(
   transactions: TransactionRow[],
   account: string,
-  mcaPaymentsByMonth: { month: string; payments: number; count: number }[]
+  mcaPaymentsByMonth: { month: string; payments: number; count: number; lender: string }[]
 ): string {
   const header = 'Month,Work Days,Account,Lender,Withdrawal Count,Withdrawal Total,Deposit Total,Deposit Dates,Latest Withdrawal Amount';
   const rows = mcaPaymentsByMonth.map(mpm => {
@@ -82,7 +82,7 @@ export function exportMonthlyMca(
 
     return [
       escapeCsvField(mpm.month), escapeCsvField(workDays),
-      escapeCsvField(account), escapeCsvField('MCA Provider'),
+      escapeCsvField(account), escapeCsvField(mpm.lender),
       escapeCsvField(mpm.count), escapeCsvField(mpm.payments),
       escapeCsvField(depositTotal), escapeCsvField(depositDates),
       escapeCsvField(latestWithdrawalAmount),
@@ -96,13 +96,26 @@ export function exportMonthlyNegativeDays(
   account: string
 ): string {
   const header = 'Month,Work Days,Account,Lender,With. Count,With. Total,Avg Daily Bal,Low Bal,Neg Bal Days';
-  const byMonth = new Map<string, { balances: number[]; count: number }>();
 
-  for (const db of dailyBalances) {
+  // Sort daily balances by date to compute day-over-day changes
+  const sorted = [...dailyBalances].sort((a, b) => a.date.localeCompare(b.date));
+  const byMonth = new Map<string, { balances: number[]; count: number; withdrawalCount: number; withdrawalTotal: number }>();
+
+  for (let i = 0; i < sorted.length; i++) {
+    const db = sorted[i];
     const month = db.date.slice(0, 7);
-    const entry = byMonth.get(month) ?? { balances: [], count: 0 };
+    const entry = byMonth.get(month) ?? { balances: [], count: 0, withdrawalCount: 0, withdrawalTotal: 0 };
     entry.balances.push(db.balance);
     if (db.balance < 0) entry.count++;
+    // Check for significant withdrawal: balance decreased by more than $500 from previous day
+    if (i > 0) {
+      const prev = sorted[i - 1];
+      const change = prev.balance - db.balance;
+      if (change > 500) {
+        entry.withdrawalCount++;
+        entry.withdrawalTotal += change;
+      }
+    }
     byMonth.set(month, entry);
   }
 
@@ -115,7 +128,7 @@ export function exportMonthlyNegativeDays(
 
     rows.push([
       escapeCsvField(month), escapeCsvField(workDays), escapeCsvField(account),
-      escapeCsvField('N/A'), escapeCsvField(0), escapeCsvField(0),
+      escapeCsvField('N/A'), escapeCsvField(data.withdrawalCount), escapeCsvField(data.withdrawalTotal),
       escapeCsvField(avgDailyBal), escapeCsvField(lowBal), escapeCsvField(data.count),
     ].join(','));
   }
@@ -164,7 +177,9 @@ export function exportStatementsSummary(
     escapeCsvField(debits.length), escapeCsvField(endBal ?? 0),
     escapeCsvField(avgBalance), escapeCsvField(avgTrueBalance),
     escapeCsvField(negDays), escapeCsvField(overdrafts.length),
-    escapeCsvField(nsfs.length), escapeCsvField(lowDays), escapeCsvField(0),
+    escapeCsvField(nsfs.length), escapeCsvField(lowDays),
+    // TODO: MCA Withhold Percent requires withholding data not currently in mca_findings
+    escapeCsvField(0),
   ].join(',');
 
   return [header, row].join('\n');

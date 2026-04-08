@@ -23,6 +23,7 @@ class Document extends Model
         'balances',
         'ai_analysis',
         'mca_findings',
+        'transaction_classification',
         'page_count',
         'error',
     ];
@@ -35,6 +36,7 @@ class Document extends Model
         'balances' => 'array',
         'ai_analysis' => 'array',
         'mca_findings' => 'array',
+        'transaction_classification' => 'array',
         'page_count' => 'integer',
     ];
 

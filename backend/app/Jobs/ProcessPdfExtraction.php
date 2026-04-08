@@ -194,6 +194,7 @@ class ProcessPdfExtraction implements ShouldQueue
                         'balances' => $balances,
                         'ai_analysis' => $aiAnalysis,
                         'mca_findings' => $mcaFindings,
+                        'transaction_classification' => $transactionClassification,
                         'page_count' => $pageCount,
                     ]);
                 }
@@ -316,6 +317,7 @@ class ProcessPdfExtraction implements ShouldQueue
                     'balances' => $result['balances'] ?? null,
                     'ai_analysis' => $result['ai_analysis'] ?? null,
                     'mca_findings' => $result['mca_findings'] ?? null,
+                    'transaction_classification' => $result['transaction_classification'] ?? null,
                     'page_count' => $result['page_count'] ?? null,
                 ]);
             }

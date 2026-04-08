@@ -56,11 +56,11 @@ export function autoTag(
 
   const amount = credit ?? debit ?? 0;
   if (Math.abs(amount) > 100_000) tags.push('Large/Unusual');
-  if (
-    desc.includes('overdraft') ||
-    desc.includes('nsf') ||
-    desc.includes('returned')
-  ) {
+  if (desc.includes('nsf')) {
+    tags.push('NSF');
+  } else if (desc.includes('overdraft')) {
+    tags.push('Overdraft');
+  } else if (desc.includes('returned')) {
     tags.push('Returned Item');
   }
 

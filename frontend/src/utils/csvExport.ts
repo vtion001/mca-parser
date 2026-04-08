@@ -322,7 +322,7 @@ export function exportMonthlyCashFlows(
 export function exportMonthlyMca(
   transactions: TransactionRow[],
   accountName: string,
-  mcaPaymentsByMonth: { month: string; payments: number; count: number }[]
+  mcaPaymentsByMonth: { month: string; payments: number; count: number; lender: string }[]
 ): string {
   const header = 'Month,Work Days,Account,Lender,Withdrawal Count,Withdrawal Total,Deposit Total,Deposit Dates,Latest Withdrawal Amount';
 
@@ -353,7 +353,7 @@ export function exportMonthlyMca(
       escapeCsvField(mpm.month),
       escapeCsvField(workDays),
       escapeCsvField(accountName),
-      escapeCsvField('MCA Provider'),
+      escapeCsvField(mpm.lender),
       escapeCsvField(mpm.count),
       escapeCsvField(mpm.payments),
       escapeCsvField(depositTotal),
@@ -689,7 +689,7 @@ export interface ExportConfig {
   accountName: string;
   bankName: string;
   statementPeriod: string;
-  mcaPaymentsByMonth: { month: string; payments: number; count: number }[];
+  mcaPaymentsByMonth: { month: string; payments: number; count: number; lender: string }[];
   revenueStats: {
     totalCredits: number;
     totalDebits: number;

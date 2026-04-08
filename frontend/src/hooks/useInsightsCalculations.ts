@@ -12,6 +12,7 @@ interface McAByMonth {
   month: string;
   payments: number;
   count: number;
+  lender: string;
 }
 
 interface RevenueStats {
@@ -58,7 +59,7 @@ function buildDailyBalances(txns: TransactionRow[], begBal: number | null): Dail
   return balances;
 }
 
-function buildMCAByMonth(txns: TransactionRow[]): McAByMonth[] {
+function buildMCAByMonth(txns: TransactionRow[], mcaFindings: ExtractionResult['mca_findings']): McAByMonth[] {
   const mcaTxns = filterByTag(txns, 'mca');
   const map = new Map<string, { payments: number; count: number }>();
   for (const t of mcaTxns) {
@@ -70,8 +71,10 @@ function buildMCAByMonth(txns: TransactionRow[]): McAByMonth[] {
       map.set(month, entry);
     }
   }
+  // Get the primary lender from mca_findings (most common provider)
+  const lender = mcaFindings?.summary?.unique_providers?.[0] ?? 'MCA Provider';
   return Array.from(map.entries())
-    .map(([month, v]) => ({ month, payments: v.payments, count: v.count }))
+    .map(([month, v]) => ({ month, payments: v.payments, count: v.count, lender }))
     .sort((a, b) => a.month.localeCompare(b.month));
 }
 
@@ -134,7 +137,7 @@ export function useInsightsCalculations(result: ExtractionResult): InsightsCalcu
     return {
       transactions,
       revenueStats,
-      mcaPaymentsByMonth: buildMCAByMonth(transactions),
+      mcaPaymentsByMonth: buildMCAByMonth(transactions, result.mca_findings),
       dailyBalances: buildDailyBalances(transactions, begBal),
       begBal,
       endBal,

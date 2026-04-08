@@ -37,7 +37,7 @@ export interface ExportConfig {
   accountName: string;
   bankName: string;
   statementPeriod: string;
-  mcaPaymentsByMonth: { month: string; payments: number; count: number }[];
+  mcaPaymentsByMonth: { month: string; payments: number; count: number; lender: string }[];
   revenueStats: {
     totalCredits: number;
     totalDebits: number;
