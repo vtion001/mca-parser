@@ -24,6 +24,7 @@ class User extends Model
 
     protected $casts = [
         'account_id' => 'integer',
+        'token_expires_at' => 'datetime',
     ];
 
     public function account(): BelongsTo

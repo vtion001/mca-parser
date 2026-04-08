@@ -37,7 +37,7 @@ function EmptyState() {
 
 interface StatementsViewProps {
   result: ExtractionResult | null;
-  onReviewStatement?: (result: ExtractionResult) => void;
+  onReviewStatement?: (row: StatementRow) => void;
 }
 
 export function StatementsView({ result, onReviewStatement }: StatementsViewProps) {

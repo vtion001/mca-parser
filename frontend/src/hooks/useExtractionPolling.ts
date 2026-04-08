@@ -59,7 +59,7 @@ export function useExtractionPolling({ setState, clearPolling, pollingRef }: Use
               setState(prev => ({
                 ...prev,
                 status: 'failed',
-                error: 'Extraction timed out — queue worker may not be running. Check docker-compose.',
+                error: 'Extraction timed out — queue worker may not be running. Try refreshing the page or check that `php artisan queue:work` is active.',
               }));
               resolve(null);
             }

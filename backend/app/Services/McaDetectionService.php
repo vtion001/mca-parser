@@ -328,8 +328,8 @@ class McaDetectionService
             ];
         }
 
-        // Try abbreviation match (normalized)
-        if (isset($this->providerMap[$normalizedNoSpaces])) {
+        // Try abbreviation match (normalized) - only if result is meaningful (>=2 chars)
+        if (strlen($normalizedNoSpaces) >= 2 && isset($this->providerMap[$normalizedNoSpaces])) {
             return [
                 'name' => $this->providerMap[$normalizedNoSpaces]['name'],
                 'confidence' => 0.90,
@@ -495,6 +495,15 @@ class McaDetectionService
             return null;
         }
 
+        // Guard: reject rows that are clearly table formatting/separators
+        // Skip if all non-empty cells are just dashes/spaces/separators (table formatting lines)
+        $meaningfulCells = array_filter($cells, function($cell) {
+            return preg_match('/[a-zA-Z0-9]/', $cell);
+        });
+        if (empty($meaningfulCells)) {
+            return null;
+        }
+
         // Try to identify which cell is date, description, and amount
         $date = null;
         $description = null;
@@ -583,10 +592,12 @@ class McaDetectionService
             '/^(total|sum|amount)\s+/i',
             '/^page\s+\d+/i',
             '/^(account|statement|bank)\s+/i',
-            '/^-+$/',
+            '/^[\s\-]+$/',  // Lines with only dashes/spaces (table formatting)
             '/^===+$/',
             '/^(date|description|amount|debit|credit|balance)$/i',
             '/^#+\s*/',  // Headers
+            '/^\s*\|[\s\-:|]+\|\s*$/',  // Markdown table separator rows like |---|---|---|
+            '/^\s*\|[\s|]*\|\s*$/',  // Empty or spacer rows in tables (only pipes and whitespace)
         ];
 
         foreach ($skipPatterns as $pattern) {

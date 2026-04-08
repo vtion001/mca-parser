@@ -11,7 +11,7 @@ MCA PDF Scrubber is a full-stack application for uploading PDF documents and per
 ```
 Browser → nginx:8000 → React (frontend) or Laravel (API)
                       → Python Docling Service (:8001)
-                      → Supabase PostgreSQL/Redis (data/cache)
+                      → Supabase PostgreSQL + Redis (data/cache)
 ```
 
 **In Docker:** nginx reverse proxy on port 8000 routes to frontend, Laravel API, and Docling service. The `frontend` container has no direct port exposure — it's served exclusively through nginx.
@@ -32,9 +32,9 @@ Browser → nginx:8000 → React (frontend) or Laravel (API)
 
 - **Frontend:** React 18 + TypeScript + Tailwind CSS + Vite (app name: "Dave")
 - **Frontend (Docker):** Served by nginx, not directly accessible on a separate port
-- **Backend:** Laravel 11 (PHP 8.2+) + SQLite (local) / Supabase PostgreSQL (production) + Redis
+- **Backend:** Laravel 11 (PHP 8.2+) + Supabase PostgreSQL + Redis
 - **PDF Extraction:** Python Docling service (FastAPI + docling library + EasyOCR)
-- **AI Analysis:** OpenRouterService (extends BaseAIService) using OpenAI GPT-3.5 Turbo by default (configurable via `OPENROUTER_MODEL`)
+- **AI Analysis:** OpenRouterService (extends BaseAIService) using configurable model via `OPENROUTER_MODEL`
 
 ## Commands
 
@@ -51,20 +51,15 @@ docker-compose -f docker-compose.yml -f docker-compose.dev.yml up --build --prof
 docker-compose -f docker-compose.yml -f docker-compose.monitoring.yml up --build
 
 # Rebuild after frontend changes (rebuilds both frontend and nginx containers)
-docker-compose build frontend nginx
-docker-compose up -d
-
-# Rebuild only frontend (for React/CSS changes)
-docker-compose build frontend
-docker-compose up -d
+docker-compose build frontend nginx && docker-compose up -d
 
 # Individual services (for hot-reload development)
-cd frontend && npm run dev      # React on :5173 (proxies to nginx:8000)
-cd backend && php artisan serve # Laravel on :8000
+cd frontend && npm run dev      # Vite dev server (port 4200, auto-fallback if taken)
+cd backend && php artisan serve # Laravel on :9000
 cd python-service && python src/server.py  # Docling on :8001
 ```
 
-**Docker networking note:** In Docker, nginx handles routing so all services are accessed via `http://localhost:8000`. Running `npm run dev` directly gives you Vite's hot module replacement on `:5173`.
+**Vite dev proxy:** When running `npm run dev` locally, Vite proxies `/api/*` requests to `http://localhost:8000` (nginx). In Docker, nginx handles all routing so services are accessed via `http://localhost:8000`.
 
 ### Backend (Laravel/PHP)
 ```bash
@@ -72,9 +67,10 @@ cd backend
 composer install
 cp .env.example .env 2>/dev/null || true
 php artisan key:generate
-php artisan serve           # Start server on :8000
+php artisan serve           # Start server on :9000
 php artisan test            # Run all PHPUnit tests
 php artisan test --filter=ClassName  # Run specific test class
+php artisan test --filter=test_method_name  # Run specific test method
 php artisan queue:work      # Process background jobs
 ```
 
@@ -82,8 +78,10 @@ php artisan queue:work      # Process background jobs
 ```bash
 cd frontend
 npm install
-npm run dev     # Vite dev server on :5173
+npm run dev     # Vite dev server on :4200 (auto-fallback if port busy)
 npm run build   # Production build
+npx vitest run  # Run unit tests (Vitest)
+npx playwright test  # Run E2E tests (requires Docker stack running)
 ```
 
 ### Python Service (Docling)
@@ -94,6 +92,28 @@ python src/server.py  # Runs on :8001
 ```
 
 Requirements: Python 3.10+, PyTorch 2.0+, Docling 2.0+
+
+## Testing
+
+Three-layer testing strategy:
+
+| Layer | Framework | Location | Command |
+|-------|-----------|----------|---------|
+| Backend Unit | PHPUnit | `backend/tests/Unit/` | `cd backend && php artisan test` |
+| Frontend Unit | Vitest | `frontend/tests/Unit/` | `cd frontend && npx vitest run` |
+| Frontend E2E | Playwright | `frontend/tests/e2e/` | `cd frontend && npx playwright test` |
+
+**E2E test requirements:** Playwright E2E tests require the full Docker stack running (`docker-compose up --build`) because they hit the live nginx proxy on port 8000.
+
+**Single test execution:**
+```bash
+# PHPUnit
+php artisan test --filter=ProcessPdfExtractionTest
+php artisan test --filter=test_job_tries_is_5
+
+# Vitest
+npx vitest run tests/Unit/export.test.ts
+```
 
 ## Key Services
 
@@ -234,6 +254,10 @@ When reviewing code, prioritize these concerns:
 3. **API Contract Integrity** - Verify frontend/backend and backend/Python service interfaces match. All endpoints use `/api/v1/` prefix.
 4. **Service Failure Grace** - Docling unavailability should return meaningful errors, not propagate internal failures.
 5. **File Lifecycle** - PDF uploads and temp files must be cleaned up even on error paths.
+
+### TypeScript Checking
+
+A PostToolUse hook runs `npx tsc --noEmit` after every Edit/Write operation in the frontend to catch type errors before they reach git. This is configured in `.claude/settings.json`.
 
 ### Deployment
 

@@ -11,6 +11,8 @@ import {
   ErrorBoundary,
 } from './components';
 import { authApi } from './services/api';
+import api from './services/api';
+import type { StatementRow } from './components/statements/types';
 import './styles/globals.css';
 
 type View = 'upload' | 'library';
@@ -182,8 +184,19 @@ function App() {
     setSelectedResult(null);
   }, []);
 
-  const handleReviewStatement = useCallback((result: import('./types/extraction').ExtractionResult) => {
-    setSelectedResult(result);
+  const handleReviewStatement = useCallback(async (row: StatementRow) => {
+    // Fetch fresh document data from API to ensure we have latest ai_analysis and mca_findings
+    try {
+      const response = await api.get(`/documents/${row.id}`);
+      const freshDoc = response.data.data;
+      if (freshDoc) {
+        setSelectedResult(freshDoc);
+      } else {
+        setSelectedResult(row.result);
+      }
+    } catch {
+      setSelectedResult(row.result);
+    }
   }, []);
 
   const handleLogout = useCallback(async () => {

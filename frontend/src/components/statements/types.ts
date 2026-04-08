@@ -27,7 +27,7 @@ export interface StatementRow {
 export interface StatementCardProps {
   row: StatementRow;
   index: number;
-  onReview?: (result: ExtractionResult) => void;
+  onReview?: (row: StatementRow) => void;
   onDelete?: (id: number) => void;
 }
 
@@ -44,5 +44,5 @@ export interface StatementFiltersProps {
 
 export interface StatementsViewProps {
   result: ExtractionResult | null;
-  onReviewStatement?: (result: ExtractionResult) => void;
+  onReviewStatement?: (row: StatementRow) => void;
 }

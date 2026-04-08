@@ -134,7 +134,7 @@ export function StatementCard({ row, index, onReview, onDelete }: StatementCardP
         <div className="w-32 flex flex-col items-end gap-1.5">
           <div className="flex items-center gap-2">
             <button
-              onClick={() => onReview?.(row.result)}
+              onClick={() => onReview?.(row)}
               className={`
                 inline-flex items-center gap-2 px-4 py-2.5 text-xs font-semibold rounded-lg
                 transition-all duration-150 shadow-sm
