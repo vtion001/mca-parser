@@ -14,6 +14,7 @@ class User extends Model
         'email',
         'password',
         'api_token',
+        'token_expires_at',
     ];
 
     protected $hidden = [
@@ -35,9 +36,10 @@ class User extends Model
         $this->attributes['password'] = Hash::needsRehash($value) ? Hash::make($value) : $value;
     }
 
-    public function regenerateToken(): string
+    public function regenerateToken(int $daysValid = 30): string
     {
         $this->api_token = bin2hex(random_bytes(32));
+        $this->token_expires_at = now()->addDays($daysValid);
         $this->save();
         return $this->api_token;
     }

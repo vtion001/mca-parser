@@ -12,6 +12,11 @@ interface LoginPageProps {
   onLogin: (user: User) => void;
 }
 
+// TODO: Migrate token storage from localStorage to httpOnly cookies to mitigate XSS attacks.
+// Storing Bearer tokens in localStorage allows any malicious script to read them.
+// The long-term fix is to store the token in an httpOnly, Secure, SameSite=Strict cookie
+// and handle token refresh on the backend. This requires changes to AuthController (set-cookie header)
+// and the API service (read token from cookie, not localStorage).
 export function LoginPage({ onLogin }: LoginPageProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');

@@ -212,6 +212,7 @@ class ProcessPdfExtraction implements ShouldQueue
         } catch (\Exception $e) {
             Log::error('ProcessPdfExtraction failed: ' . $e->getMessage());
             $this->failJob($e->getMessage());
+            throw $e;  // Re-throw so Laravel marks job as failed and retries
         }
     }
 

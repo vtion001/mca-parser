@@ -38,6 +38,14 @@ class AuthMiddleware
             ], 401);
         }
 
+        // Check token expiry
+        if ($user->token_expires_at && $user->token_expires_at->isPast()) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Token expired.',
+            ], 401);
+        }
+
         $request->attributes->set('user', $user);
         $request->setUserResolver(fn () => $user);
 

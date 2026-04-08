@@ -1,0 +1,146 @@
+[
+  {
+    "name": "BlueVine",
+    "abbreviations": ["BV", "BlueVine", "Blue Vine"],
+    "keywords": ["bluevine", "blue vine", "bv funding"],
+    "website": "https://www.bluevine.com"
+  },
+  {
+    "name": "Can Capital",
+    "abbreviations": ["CC", "CanCap", "Can Capital"],
+    "keywords": ["can capital", "can cap", "cc funding"],
+    "website": "https://www.cancapital.com"
+  },
+  {
+    "name": "Fundbox",
+    "abbreviations": ["FB", "FBX", "Fundbox"],
+    "keywords": ["fundbox", "fb invoice", "fund box"],
+    "website": "https://fundbox.com"
+  },
+  {
+    "name": "Kabbage",
+    "abbreviations": ["KB", "KAB", "Kabbage"],
+    "keywords": ["kabbage", "kb funding"],
+    "website": "https://www.kabbage.com"
+  },
+  {
+    "name": "OnDeck",
+    "abbreviations": ["OD", "ODK", "OnDeck"],
+    "keywords": ["ondeck", "od capital", "ondeck funding"],
+    "website": "https://www.ondeck.com"
+  },
+  {
+    "name": "Snap Capital",
+    "abbreviations": ["SC", "SNAP", "SnapCap"],
+    "keywords": ["snap capital", "snapcap", "snap funding"],
+    "website": "https://www.snapcap.com"
+  },
+  {
+    "name": "Stripe Capital",
+    "abbreviations": ["STC", "STRIPECAP", "Stripe Cap"],
+    "keywords": ["stripe capital", "stripe cap", "stripe funding"],
+    "website": "https://stripe.com/capital"
+  },
+  {
+    "name": "PayPal Working Capital",
+    "abbreviations": ["PPWC", "PPWC", "PayPal Cap"],
+    "keywords": ["paypal working capital", "paypal capital", "ppwc"],
+    "website": "https://www.paypal.com/workingcapital"
+  },
+  {
+    "name": "Square Capital",
+    "abbreviations": ["SQC", "SQCAP", "Square Cap"],
+    "keywords": ["square capital", "square cap", "square funding"],
+    "website": "https://squareup.com/capital"
+  },
+  {
+    "name": "Amazon Lending",
+    "abbreviations": ["AZL", "AMZL", "Amazon Lend"],
+    "keywords": ["amazon lending", "amazon credit", "azl funding"],
+    "website": "https://www.amazon.com/lending"
+  },
+  {
+    "name": "Funding Circle",
+    "abbreviations": ["FC", "FCH", "FundCircle"],
+    "keywords": ["funding circle", "fc lending", "fund circle"],
+    "website": "https://www.fundingcircle.com"
+  },
+  {
+    "name": "Biz2Credit",
+    "abbreviations": ["B2C", "BIZ2", "Biz2Credit"],
+    "keywords": ["biz2credit", "b2c funding", "biz to credit"],
+    "website": "https://www.biz2credit.com"
+  },
+  {
+    "name": "National Funding",
+    "abbreviations": ["NF", "NATF", "NatFunding"],
+    "keywords": ["national funding", "natfund", "nf capital"],
+    "website": "https://www.nationalfunding.com"
+  },
+  {
+    "name": "Backd",
+    "abbreviations": ["BD", "BACKD", "Backd"],
+    "keywords": ["backd", "bd funding", "backd capital"],
+    "website": "https://www.backd.com"
+  },
+  {
+    "name": "Swift Capital",
+    "abbreviations": ["SWC", "SWFT", "SwiftCap"],
+    "keywords": ["swift capital", "swiftcap", "swc funding"],
+    "website": "https://www.swiftcapital.com"
+  },
+  {
+    "name": "AmeriState Capital",
+    "abbreviations": ["ASC", "AMSC", "AmeriState"],
+    "keywords": ["ameristate", "ameristate capital", "asc funding"],
+    "website": "https://www.ameristate.com"
+  },
+  {
+    "name": "Yellowstone Capital",
+    "abbreviations": ["YLC", "YLST", "Yellowstone"],
+    "keywords": ["yellowstone capital", "ylc funding", "yellowstone"],
+    "website": "https://www.yellowstonecapital.com"
+  },
+  {
+    "name": "RBL Capital",
+    "abbreviations": ["RBL", "RBLC", "RBL Cap"],
+    "keywords": ["rbl capital", "rbl funding", "rblc"],
+    "website": "https://www.rblcapital.com"
+  },
+  {
+    "name": "Fora Financial",
+    "abbreviations": ["FF", "FORA", "ForaFin"],
+    "keywords": ["fora financial", "fora funding", "ff capital"],
+    "website": "https://www.forafinancial.com"
+  },
+  {
+    "name": "Kapitus",
+    "abbreviations": ["KAP", "KPT", "Kapitus"],
+    "keywords": ["kapitus", "kaptius funding", "kap small business"],
+    "website": "https://www.kapitus.com"
+  },
+  {
+    "name": "Headway Capital",
+    "abbreviations": ["HWC", "HWCA", "HeadwayCap"],
+    "keywords": ["headway capital", "headwaycap", "hwc funding"],
+    "website": "https://www.headwaycapital.com"
+  },
+  {
+    "name": "Fundwise Capital",
+    "abbreviations": ["FWC", "FWCA", "FundwiseCap"],
+    "keywords": ["fundwise capital", "fundwisecap", "fwc funding"],
+    "website": "https://www.fundwisecapital.com"
+  },
+  {
+    "name": "Riviera Finance",
+    "abbreviations": ["RVF", "RIVF", "RivieraFin"],
+    "keywords": ["riviera finance", "rivierafinance", "rvf funding"],
+    "website": "https://www.rivierafinance.com"
+  },
+  {
+    "name": "MCA Factors",
+    "abbreviations": ["MCAF", "MCAFAC", "MCAFactor"],
+    "keywords": ["mca factors", "mcafactors", "mca factor"],
+    "website": ""
+  }
+]
