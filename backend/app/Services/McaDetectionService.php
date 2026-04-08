@@ -258,7 +258,9 @@ class McaDetectionService
 
         if (!$isMcaProduct) {
             foreach ($this->excludedProcessors as $processor) {
-                if (strpos($descLower, $processor) !== false) {
+                // Use word-boundary regex to avoid excluding MCA product names like "STRIPE CAP"
+                // "stripe" alone → exclude, "stripe capital" → do NOT exclude
+                if (preg_match('/\b' . preg_quote($processor, '/') . '\b/i', $descLower)) {
                     return 0.0;
                 }
             }

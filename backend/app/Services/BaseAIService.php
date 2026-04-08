@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
@@ -10,10 +11,13 @@ use Psr\Log\NullLogger;
  * Abstract base class for AI document analysis services.
  *
  * Provides shared logic for prompt building, response parsing,
- * fallback analysis, and the main document analysis workflow.
+ * fallback analysis, circuit breaker pattern, and the main document analysis workflow.
  */
 abstract class BaseAIService
 {
+    private const FAILURE_THRESHOLD = 3;
+    private const COOLDOWN_SECONDS = 60;
+
     protected string $apiKey;
     protected string $apiUrl;
     protected int $timeout;
@@ -61,6 +65,59 @@ abstract class BaseAIService
     abstract protected function callApi(string $prompt): array;
 
     /**
+     * Check if the circuit breaker is open (degraded state).
+     * After 3 consecutive failures, the circuit opens for 60 seconds.
+     */
+    private function isCircuitOpen(): bool
+    {
+        $state = Cache::get($this->getCircuitStateKey());
+
+        if ($state === null) {
+            return false;
+        }
+
+        if ($state['open_until'] !== null && now()->timestamp >= $state['open_until']) {
+            // Cooldown expired — reset to closed state
+            Cache::forget($this->getCircuitStateKey());
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Record a successful API call — resets failure counter.
+     */
+    private function recordSuccess(): void
+    {
+        Cache::forget($this->getCircuitStateKey());
+    }
+
+    /**
+     * Record a failed API call — increments failure counter and may open the circuit.
+     */
+    private function recordFailure(): void
+    {
+        $key = $this->getCircuitStateKey();
+        $state = Cache::get($key) ?? ['failures' => 0, 'open_until' => null];
+
+        $state['failures']++;
+
+        if ($state['failures'] >= self::FAILURE_THRESHOLD) {
+            $state['open_until'] = now()->addSeconds(self::COOLDOWN_SECONDS)->timestamp;
+            $state['failures'] = 0;
+            $this->logger->warning($this->getProviderName() . ' circuit breaker opened for ' . self::COOLDOWN_SECONDS . 's');
+        }
+
+        Cache::put($key, $state, now()->addSeconds(self::COOLDOWN_SECONDS * 2));
+    }
+
+    private function getCircuitStateKey(): string
+    {
+        return 'ai_circuit:' . static::class;
+    }
+
+    /**
      * Analyze PDF content and provide qualifications
      */
     public function analyzeDocument(
@@ -74,10 +131,17 @@ abstract class BaseAIService
             return $this->getFallbackAnalysis($markdown, $documentType, $keyDetails, $balances);
         }
 
+        // Circuit breaker: skip API call if in degraded state
+        if ($this->isCircuitOpen()) {
+            $this->logger->info($this->getProviderName() . ' circuit open — using fallback');
+            return $this->getFallbackAnalysis($markdown, $documentType, $keyDetails, $balances);
+        }
+
         try {
             $prompt = $this->buildPrompt($markdown, $documentType, $keyDetails, $balances);
 
             $response = $this->callApi($prompt);
+            $this->recordSuccess();
 
             return [
                 'success' => true,
@@ -85,6 +149,7 @@ abstract class BaseAIService
             ];
         } catch (\Exception $e) {
             $this->logger->error($this->getProviderName() . ' AI analysis failed: ' . $e->getMessage());
+            $this->recordFailure();
 
             return $this->getFallbackAnalysis($markdown, $documentType, $keyDetails, $balances);
         }
