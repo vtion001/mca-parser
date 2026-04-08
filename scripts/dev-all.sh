@@ -55,7 +55,7 @@ cd "$BACKEND_DIR" && php artisan serve --port=9000 &
 
 # Start Python Docling service
 log "Starting Docling service on :8001..."
-cd "$SERVICE_DIR" && python src/server.py &
+cd "$SERVICE_DIR" && python -m src.server &
 
 # Start Vite frontend (HMR)
 log "Starting React/Vite on :4200..."
