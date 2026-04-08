@@ -2,6 +2,24 @@
 
 import type { TransactionRow } from '../types/transactions';
 
+// Re-export balance analysis functions from canonical source
+export {
+  buildDailyBalances,
+  buildTrueBalances,
+  calculateDailyCashFlows,
+  calculateMonthlyCashFlows,
+  getWorkDaysInMonth,
+  findRepeatingTransactions,
+} from './balanceAnalysis';
+
+// Import for internal use within this file
+import {
+  getWorkDaysInMonth,
+  findRepeatingTransactions,
+  calculateDailyCashFlows,
+  calculateMonthlyCashFlows,
+} from './balanceAnalysis';
+
 // ─── CSV Formatting Helpers ────────────────────────────────────────────────────
 
 /**
@@ -90,151 +108,6 @@ function getType(tx: TransactionRow): string {
   if (tx.credit !== null && tx.credit > 0) return 'Credit';
   if (tx.debit !== null && tx.debit > 0) return 'Debit';
   return 'Unknown';
-}
-
-// ─── Balance Calculation Helpers ───────────────────────────────────────────────
-
-/**
- * Build daily balances from transactions
- */
-export function buildDailyBalances(
-  transactions: TransactionRow[],
-  begBal: number | null
-): { date: string; balance: number }[] {
-  const sorted = [...transactions].sort((a, b) => a.date.localeCompare(b.date));
-  const balances: { date: string; balance: number }[] = [];
-  let running = begBal ?? 0;
-  for (const t of sorted) {
-    running += (t.credit ?? 0) - (t.debit ?? 0);
-    balances.push({ date: t.date, balance: running });
-  }
-  return balances;
-}
-
-/**
- * Build daily true balances (excluding internal transfers)
- */
-export function buildTrueBalances(
-  transactions: TransactionRow[],
-  begBal: number | null
-): { date: string; balance: number }[] {
-  const sorted = [...transactions].sort((a, b) => a.date.localeCompare(b.date));
-  const balances: { date: string; balance: number }[] = [];
-  let running = begBal ?? 0;
-  for (const t of sorted) {
-    // Only include non-transfer amounts in true balance
-    if (!isTransfer(t)) {
-      running += (t.credit ?? 0) - (t.debit ?? 0);
-    }
-    balances.push({ date: t.date, balance: running });
-  }
-  return balances;
-}
-
-/**
- * Calculate daily cash flows
- */
-export function calculateDailyCashFlows(
-  dailyBalances: { date: string; balance: number }[],
-  trueBalances: { date: string; balance: number }[]
-): { date: string; cashFlow: number; trueCashFlow: number }[] {
-  if (dailyBalances.length === 0) return [];
-
-  const cashFlows: { date: string; cashFlow: number; trueCashFlow: number }[] = [];
-  for (let i = 0; i < dailyBalances.length; i++) {
-    const current = dailyBalances[i];
-    const prev = i > 0 ? dailyBalances[i - 1] : null;
-    const cashFlow = prev ? current.balance - prev.balance : current.balance;
-    const truePrev = i > 0 ? trueBalances[i - 1] : null;
-    const trueCashFlow = truePrev ? trueBalances[i].balance - truePrev.balance : trueBalances[i].balance;
-    cashFlows.push({
-      date: current.date,
-      cashFlow,
-      trueCashFlow,
-    });
-  }
-  return cashFlows;
-}
-
-/**
- * Calculate monthly cash flows
- */
-export function calculateMonthlyCashFlows(
-  dailyCashFlows: { date: string; cashFlow: number; trueCashFlow: number }[]
-): { month: string; cashFlow: number; trueCashFlow: number }[] {
-  const map = new Map<string, { cashFlow: number; trueCashFlow: number }>();
-  for (const dc of dailyCashFlows) {
-    const month = dc.date.slice(0, 7);
-    const entry = map.get(month) ?? { cashFlow: 0, trueCashFlow: 0 };
-    entry.cashFlow += dc.cashFlow;
-    entry.trueCashFlow += dc.trueCashFlow;
-    map.set(month, entry);
-  }
-  return Array.from(map.entries())
-    .map(([month, v]) => ({ month, cashFlow: v.cashFlow, trueCashFlow: v.trueCashFlow }))
-    .sort((a, b) => a.month.localeCompare(b.month));
-}
-
-/**
- * Detect repeating transactions (same amount on regular intervals)
- */
-export function findRepeatingTransactions(
-  transactions: TransactionRow[]
-): TransactionRow[] {
-  const repeating: TransactionRow[] = [];
-  const amountMap = new Map<number, TransactionRow[]>();
-
-  // Group transactions by absolute amount
-  for (const tx of transactions) {
-    const amount = getAmount(tx);
-    if (amount > 0) {
-      const existing = amountMap.get(amount) ?? [];
-      existing.push(tx);
-      amountMap.set(amount, existing);
-    }
-  }
-
-  // Find amounts that appear on regular intervals (within 5 days tolerance)
-  for (const [, txs] of amountMap) {
-    if (txs.length < 2) continue;
-
-    const sorted = [...txs].sort((a, b) => a.date.localeCompare(b.date));
-    let isRepeating = true;
-
-    for (let i = 1; i < sorted.length; i++) {
-      const prevDate = new Date(sorted[i - 1].date);
-      const currDate = new Date(sorted[i].date);
-      const diffDays = (currDate.getTime() - prevDate.getTime()) / (1000 * 60 * 60 * 24);
-
-      // If not a regular interval (allow weekly/biweekly/monthly patterns)
-      if (diffDays > 35 || diffDays < 3) {
-        isRepeating = false;
-        break;
-      }
-    }
-
-    if (isRepeating) {
-      repeating.push(...sorted);
-    }
-  }
-
-  return repeating;
-}
-
-/**
- * Calculate work days in a month (simplified - weekdays only)
- */
-export function getWorkDaysInMonth(year: number, month: number): number {
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  let workDays = 0;
-  for (let day = 1; day <= daysInMonth; day++) {
-    const date = new Date(year, month, day);
-    const dayOfWeek = date.getDay();
-    if (dayOfWeek !== 0 && dayOfWeek !== 6) {
-      workDays++;
-    }
-  }
-  return workDays;
 }
 
 // ─── Export Functions ──────────────────────────────────────────────────────────

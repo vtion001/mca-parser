@@ -6,7 +6,8 @@ import { fmtMoney } from './statements/utils';
 import { useInsightsCalculations } from '../hooks/useInsightsCalculations';
 import { DataTable } from './tables/DataTable';
 import { MiniLineChart } from './charts/MiniLineChart';
-import { exportData, buildTrueBalances, downloadCsv, type ExportType } from '../utils/csvExport';
+import { exportData, downloadCsv, type ExportType } from '../utils/csvExport';
+import { buildTrueBalances } from '../utils/balanceAnalysis';
 import { EXPORT_OPTIONS } from '../types/export';
 
 // ─── Sub-components ────────────────────────────────────────────────────────────
