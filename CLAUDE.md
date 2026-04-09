@@ -54,12 +54,14 @@ docker-compose -f docker-compose.yml -f docker-compose.monitoring.yml up --build
 docker-compose build frontend nginx && docker-compose up -d
 
 # Individual services (for hot-reload development)
-cd frontend && npm run dev      # Vite dev server (port 4200, auto-fallback if taken)
+cd frontend && npm run dev      # Vite dev server (port 4200 by default, or VITE_PORT env var; docker-compose uses 5173)
 cd backend && php artisan serve # Laravel on :9000
 cd python-service && python src/server.py  # Docling on :8001
 ```
 
 **Vite dev proxy:** When running `npm run dev` locally, Vite proxies `/api/*` requests to `http://localhost:8000` (nginx). In Docker, nginx handles all routing so services are accessed via `http://localhost:8000`.
+
+**Port note:** Vite defaults to port 4200 (`vite.config.ts` `server.port`), but `docker-compose.override.yml` overrides this to 5173 when running with plain `docker-compose up`. Use `docker-compose -f docker-compose.yml -f docker-compose.dev.yml up --profile dev` for the explicit dev stack on port 4200.
 
 ### Backend (Laravel/PHP)
 ```bash
@@ -241,7 +243,7 @@ Required environment variables for Docker Compose (set in `.env` or shell):
 ## Development Workflow
 
 ### Before Completing Implementation
-1. Run `/code-review:code-review` to check production readiness
+1. Use the `code-reviewer` agent to check production readiness
 2. Fix any issues flagged with confidence >= 75
 3. Update this CLAUDE.md if new patterns, services, or architecture are introduced
 
