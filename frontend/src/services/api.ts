@@ -150,4 +150,42 @@ export const authApi = {
   },
 };
 
+// Customer API
+export const customerApi = {
+  // Dashboard
+  getDashboard: async () => {
+    const response = await api.get('/customer/dashboard');
+    return response.data;
+  },
+
+  // MCA Standing
+  getMcaStanding: async () => {
+    const response = await api.get('/customer/mca-standing');
+    return response.data;
+  },
+
+  // Documents
+  uploadDocument: async (formData: FormData) => {
+    const response = await api.post('/customer/documents/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
+
+  getDocuments: async (params?: { status?: string; document_type?: string; per_page?: number }) => {
+    const response = await api.get('/customer/documents', { params });
+    return response.data;
+  },
+
+  getDocument: async (id: number) => {
+    const response = await api.get(`/customer/documents/${id}`);
+    return response.data;
+  },
+
+  deleteDocument: async (id: number) => {
+    const response = await api.delete(`/customer/documents/${id}`);
+    return response.data;
+  },
+};
+
 export default api;

@@ -8,6 +8,11 @@ use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\BatchController;
 use App\Http\Controllers\ComparisonController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\CustomerController;
+use App\Http\Controllers\VerificationController;
+use App\Http\Controllers\CustomerDocumentController;
+use App\Http\Controllers\CustomerDashboardController;
+use App\Http\Controllers\McaStandingController;
 
 Route::prefix('v1')->group(function () {
     Route::get('/health', [HealthController::class, 'index']);
@@ -17,6 +22,11 @@ Route::prefix('v1')->group(function () {
     // Auth endpoints (public, rate-limited)
     Route::post('/auth/register', [AuthController::class, 'register'])->middleware('throttle:5,10');
     Route::post('/auth/login', [AuthController::class, 'login'])->middleware('throttle:5,10');
+    Route::post('/auth/forgot-password', [AuthController::class, 'forgotPassword'])->middleware('throttle:5,10');
+    Route::post('/auth/reset-password', [AuthController::class, 'resetPassword'])->middleware('throttle:5,10');
+
+    // Email verification (public with token)
+    Route::post('/auth/verify', [VerificationController::class, 'verify'])->middleware('throttle:5,10');
 
     // All API endpoints require auth via Bearer token
     Route::middleware('auth.api')->group(function () {
@@ -32,6 +42,28 @@ Route::prefix('v1')->group(function () {
         // Auth management
         Route::post('/auth/logout', [AuthController::class, 'logout']);
         Route::get('/auth/me', [AuthController::class, 'me']);
+
+        // Email verification (authenticated - resend)
+        Route::post('/auth/resend-verification', [VerificationController::class, 'resend']);
+
+        // Customer profile management
+        Route::prefix('customer')->group(function () {
+            Route::get('/profile', [CustomerController::class, 'profile']);
+            Route::patch('/profile', [CustomerController::class, 'update']);
+            Route::post('/change-password', [CustomerController::class, 'changePassword']);
+
+            // Document upload and management
+            Route::post('/documents/upload', [CustomerDocumentController::class, 'upload']);
+            Route::get('/documents', [CustomerDocumentController::class, 'index']);
+            Route::get('/documents/{id}', [CustomerDocumentController::class, 'show']);
+            Route::delete('/documents/{id}', [CustomerDocumentController::class, 'destroy']);
+
+            // MCA standing calculator
+            Route::get('/mca-standing', [McaStandingController::class, 'index']);
+
+            // Dashboard overview
+            Route::get('/dashboard', [CustomerDashboardController::class, 'index']);
+        });
 
         // Document/batch management — account-isolated
         Route::middleware('account')->group(function () {

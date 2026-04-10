@@ -16,6 +16,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'auth.api' => \App\Http\Middleware\AuthMiddleware::class,
             'account' => \App\Http\Middleware\AccountMiddleware::class,
+            'verified' => \App\Http\Middleware\VerifiedMiddleware::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
